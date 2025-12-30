@@ -78,6 +78,8 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         # initialize footstep planner
         reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10
+        #reference = [(0.1, 0., 0.)] * 5 + [(0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
+
         self.footstep_planner = footstep_planner.FootstepPlanner(
             reference,
             self.initial['lfoot']['pos'],
@@ -204,13 +206,13 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         # compute total contact force
         force = np.zeros(3)
-        for contact in world.getLastCollisionResult().getContacts():
+        for contact in self.world.getLastCollisionResult().getContacts():
             force += contact.force
 
         # compute zmp
         zmp = np.zeros(3)
         zmp[2] = com_position[2] - force[2] / (self.hrp4.getMass() * self.params['g'] / self.params['h'])
-        for contact in world.getLastCollisionResult().getContacts():
+        for contact in self.world.getLastCollisionResult().getContacts():
             if contact.force[2] <= 0.1: continue
             zmp[0] += (contact.point[0] * contact.force[2] / force[2] + (zmp[2] - contact.point[2]) * contact.force[0] / force[2])
             zmp[1] += (contact.point[1] * contact.force[2] / force[2] + (zmp[2] - contact.point[2]) * contact.force[1] / force[2])
@@ -249,7 +251,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                       'acc': np.zeros(3)}
         }
 
-if __name__ == "__main__":
+def simulation_setup(render = True):
     world = dart.simulation.World()
 
     urdfParser = dart.utils.DartLoader()
@@ -270,9 +272,11 @@ if __name__ == "__main__":
 
     node = Hrp4Controller(world, hrp4)
 
+    if not render: return world, None, node
+
     # create world node and add it to viewer
     viewer = dart.gui.osg.Viewer()
-    node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
+    #node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
     viewer.addWorldNode(node)
 
     #viewer.setUpViewInWindow(0, 0, 1920, 1080)
@@ -281,4 +285,21 @@ if __name__ == "__main__":
     viewer.setCameraHomePosition([5., -1., 1.5],
                                  [1.,  0., 0.5],
                                  [0.,  0., 1. ])
-    viewer.run()
+    #viewer.frame()
+
+    return world, viewer, node
+
+
+
+if __name__ == "__main__":
+    world, viewer, node = simulation_setup()
+    
+    num_steps = 10_000
+
+    for step in range(num_steps):
+
+        node.customPreStep()
+        world.step()
+
+        if step % 5 == 0: 
+            viewer.frame()
