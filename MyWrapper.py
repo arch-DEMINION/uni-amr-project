@@ -17,7 +17,7 @@ from logger import Logger
 
 from simulation import simulation_setup
 
-class MyEnv(gym.Env):
+class ISMPC2gym_env_wrapper(gym.Env):
   '''
   Class that is a wrapper for the ismpc environment for converting it in a gymnasium environment
   
@@ -108,15 +108,15 @@ class MyEnv(gym.Env):
     if self.verbose: print(f"taking a step using action: {action}")
 
     # convert and use the action
-    action = self.PreprocessAction(action)
+    action_dict = self.PreprocessAction(action)
 
     # take a step in to the environment
     self.node.customPreStep()
     self.world.step()
 
     # collect the state and the reward
-    state = self.GetState()
-    reward = ...
+    state_tensor, state_dict = self.GetState()
+    reward = self.GetReward(state_dict, action_dict)
 
     # update the current step counter
     self.current_step += 1
@@ -126,8 +126,8 @@ class MyEnv(gym.Env):
     truncated = self.current_step > self.max_steps   # truncate the termination because to long
 
     self.render()
-    info = {'state' : state, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
-    return state, reward, terminated, truncated, info
+    info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
+    return state_tensor, reward, terminated, truncated, info
 
   def reset(self, *, seed : int | None = None, options = None,) -> tuple[torch.tensor, dict[str, any]]:
     '''
@@ -148,14 +148,14 @@ class MyEnv(gym.Env):
     self.previous_rewards = []
 
     # reset the states and steps
-    state = self.GetState()
+    state_tensor, state_dict = self.GetState()
     self.current_step = 0
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
     if self.verbose: print("env resetted")
 
-    return state, info
+    return state_tensor, info
 
   def render(self) -> None:
     if self.verbose: print('Rendering the simulation')
@@ -228,3 +228,4 @@ class MyEnv(gym.Env):
     self.previous_rewards.append(current_reward)
 
     return current_reward
+
