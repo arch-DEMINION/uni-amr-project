@@ -91,18 +91,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.reset()
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
-  def step(self, action : torch.tensor) -> tuple[torch.tensor, float, bool, bool, dict[str, any]]:
+  def step(self, action : np.array) -> tuple[np.array, float, bool, bool, dict[str, any]]:
     '''
     Method for taking a stem in the environment performing the \"action\" and computing the reward.
     
     :param action: The action that the agent want to take in the environemnt, in our case the deviation of the footsteps
-    :ytpe action: torch.tensor
+    :ytpe action: np.array
     :return: state: the new state reached in the environment taking the action |
              reward: The reward earned for taking the action in the previous state and reaching the current state |
              terminated: Condition if simulation is terminated for unhelty condition
              truncated: Condition if simulation is truncated because too long |
              info: Dictionary containinf usefool informations
-    :rtype: tuple [state: torch.tensor | reward: float | termination: bool | truncation: bool | info: dict[str, Any]]
+    :rtype: tuple [state: np.array | reward: float | termination: bool | truncation: bool | info: dict[str, Any]]
     '''
 
     if self.verbose: print(f"taking a step using action: {action}")
@@ -115,7 +115,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.world.step()
 
     # collect the state and the reward
-    state_tensor, state_dict = self.GetState()
+    state_array, state_dict = self.GetState()
     reward = self.GetReward(state_dict, action_dict)
 
     # update the current step counter
@@ -127,9 +127,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     self.render()
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
-    return state_tensor, reward, terminated, truncated, info
+    return state_array, reward, terminated, truncated, info
 
-  def reset(self, *, seed : int | None = None, options = None,) -> tuple[torch.tensor, dict[str, any]]:
+  def reset(self, *, seed : int | None = None, options = None,) -> tuple[np.array, dict[str, any]]:
     '''
     Method for reset the simulation to the initial paramethers
     
@@ -148,14 +148,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.previous_rewards = []
 
     # reset the states and steps
-    state_tensor, state_dict = self.GetState()
+    state_array, state_dict = self.GetState()
     self.current_step = 0
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
     if self.verbose: print("env resetted")
 
-    return state_tensor, info
+    return state_array, info
 
   def render(self) -> None:
     if self.verbose: print('Rendering the simulation')
@@ -169,34 +169,34 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
 # UTILS METHODS FOR EXTRACTING INFORMATION FROM THE ENVIRONEMNT AND PROCESS DATA
 
-  def GetState(self) -> tuple[torch.tensor, dict[str, any]]:
+  def GetState(self) -> tuple[np.array, dict[str, any]]:
     '''
-    Function for computing the current state of the system both as a tensor for the policy neural network and 
+    Function for computing the current state of the system both as a np.array for the policy neural network and 
     as dictionary for easy access in fourther use like in the reward computation. 
     The state is automatically inserted in the list of previous states
     
-    :return: A tuple of hhe current state as a torch.tensor ready to be given to the policy neural network
+    :return: A tuple of the current state as a np.array ready to be given to the policy neural network
              and a dictionary of all the usefool therms for compute the reward.
 
-    :rtype: tuple[torch.tensor, dict[str, Any]]
+    :rtype: tuple[np.array, dict[str, Any]]
     '''
 
-    # compute the state as a tensor and as a dictionary
-    state_tensor = None
+    # compute the state as a np.array and as a dictionary
+    state_array = None
     state_dict = None
 
     # store the new state dict in the list of previous states
     self.previous_states.append(state_dict)
-    return state_tensor, state_dict
+    return state_array, state_dict
   
-  def PreprocessAction(self, action : torch.tensor) -> dict[str, float]:
+  def PreprocessAction(self, action : np.array) -> dict[str, float]:
     '''
-    Method for preprocess the action gived from the policy neural network (probably a tensor) 
+    Method for preprocess the action gived from the policy neural network (probably a np.array) 
     to an action that can be given to the environment (probably a list of float). 
     The action is automatically iserted int he list of previous actions
     
-    :param action: Tensor of action gived from the policy neural network
-    :type action: torch.tensor
+    :param action: np.array of action gived from the policy neural network
+    :type action: np.array
 
     :return: The action as dictonary of float that can be used to perturbate the current footsteps
     :rtype: dict[str, float]
@@ -228,4 +228,5 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.previous_rewards.append(current_reward)
 
     return current_reward
+
 
