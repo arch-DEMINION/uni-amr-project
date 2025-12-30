@@ -1,8 +1,8 @@
 import MyWrapper
 
 def main() -> None:
-    env = MyWrapper.MyEnv(verbose=False, render=True)
-    #MyWrapper.MyEnv
+    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True)
+    #MyWrapper.ISMPC2gym_env_wrapper
 
     for _ in range(3):
         s, info = env.reset()
@@ -17,4 +17,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+
     main()
