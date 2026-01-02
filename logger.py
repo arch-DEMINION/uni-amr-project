@@ -39,7 +39,8 @@ class Logger():
         self.lines = {}
         for item in self.plot_info:
             key = item['batch'], item['item'], item['level'], item['dim']
-            self.lines[key], = self.ax[item['axis']].plot([], [], color=item['color'], linestyle=item['style'])
+            self.lines[key], = self.ax[item['axis']].plot([], [], color=item['color'], linestyle=item['style'], label=f"{item['item']}_{item['batch']}")
+            self.ax[item['axis']].legend()
         
         plt.ion()
         plt.show()
