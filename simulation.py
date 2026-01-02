@@ -9,6 +9,8 @@ import inverse_dynamics as id
 import filter
 import foot_trajectory_generator as ftg
 from logger import Logger
+import timeit
+
 
 class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
     def __init__(self, world, hrp4):
@@ -30,6 +32,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             'dof': self.hrp4.getNumDofs(),
         }
         self.params['eta'] = np.sqrt(self.params['g'] / self.params['h'])
+        self.last_control = -1000
 
         # robot links
         self.lsole = hrp4.getBodyNode('l_sole')
@@ -77,7 +80,9 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.id = id.InverseDynamics(self.hrp4, redundant_dofs)
 
         # initialize footstep planner
-        reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10
+        # reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
+        reference = [(0.1, 0., 0.2)] * 5  + [(0., 0., 0.)] * 100 
+        print(reference)
         #reference = [(0.1, 0., 0.)] * 5 + [(0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
 
         self.footstep_planner = footstep_planner.FootstepPlanner(
@@ -177,7 +182,6 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         # log and plot
         self.logger.log_data(self.current, self.desired)
-        #self.logger.update_plot(self.time)
 
         self.time += 1
 
@@ -276,7 +280,6 @@ def simulation_setup(render = True):
 
     # create world node and add it to viewer
     viewer = dart.gui.osg.Viewer()
-    #node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
     viewer.addWorldNode(node)
 
     #viewer.setUpViewInWindow(0, 0, 1920, 1080)
@@ -292,14 +295,26 @@ def simulation_setup(render = True):
 
 
 if __name__ == "__main__":
-    world, viewer, node = simulation_setup()
+    world, viewer, node = simulation_setup(False)
+    # node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
+    # try: # ugly: catch footstep generation continuing beyond plan's end
+    #     viewer.run()
+    #     if step % 5 == 0: 
+    #         viewer.frame()
+    # except:
+    #     pass
+    # input()
     
-    num_steps = 10_000
+    num_steps = 1000
 
-    for step in range(num_steps):
+    try: # ugly: catch footstep generation continuing beyond plan's end
+        for step in range(num_steps):
+            node.customPreStep()
+            world.step()
+    except:
+        pass
 
-        node.customPreStep()
-        world.step()
+    node.logger.update_plot(node.time)
+    input()
 
-        if step % 5 == 0: 
-            viewer.frame()
+
