@@ -88,6 +88,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.render_rate = render_rate
     self.verbose = verbose
 
+    # size of the observatin and action spaces TO BE MODFIED
+    self.obs_size = 1
+    self.action_size = 1
+    
+    # define the observation and action spaces as box without range
+    self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
+    self.action_space      = gym.spaces.Box(low = -1     , high = 1     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+
     self.reset()
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -182,7 +190,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # compute the state as a np.array and as a dictionary
-    state_array = None
+    state_array = np.zeros(self.obs_size)
     state_dict = None
 
     # store the new state dict in the list of previous states
@@ -203,7 +211,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # copute the current action as a dictionary
-    action_dict = None
+    action_dict = np.zeros(self.action_size)
 
     # add the current action dict to the list of previous actions
     self.previous_actions.append(action_dict)
@@ -222,7 +230,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
     # compute the current reward
-    current_reward = None
+    current_reward = 0
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
