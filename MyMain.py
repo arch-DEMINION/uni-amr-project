@@ -40,7 +40,7 @@ def main() -> None:
     print("end training")
 
     print("start simulations")
-    for _ in range(3):
+    for _ in range(2):
         s, info = env.reset()
 
         for _ in range(500):
@@ -49,7 +49,7 @@ def main() -> None:
 
             if term or trunc: break
 
-    print("finisched")
+    input("finisched")
 
 
 

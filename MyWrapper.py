@@ -15,7 +15,7 @@ import filter
 import foot_trajectory_generator as ftg
 from logger import Logger
 
-from simulation import simulation_setup
+import simulation
 
 class ISMPC2gym_env_wrapper(gym.Env):
   '''
@@ -27,11 +27,26 @@ class ISMPC2gym_env_wrapper(gym.Env):
   :var max_step: maximum steps for the simulations then truncate
   :vartype max_step: int
 
+  :var world: World of Dartpy in wich the simulation take place
+  :vartype world: dart.simulation.World
+  
+  :var viewer: Viewer of Dartpy for render the simulation
+  :vartype viewer: dart.gui.osg.Viewer
+
+  :var node: The node of Dartpy of the controller and the robot
+  :vartype node: Hrp4Controller
+
   :var render: Set to True if want to render the simulation (Only True for now)
   :vartype render: bool 
 
   :var render_rate: Render the simulation each \"render_rate\" steps 
   :vartype render_rate: int
+
+  :var show_plot: Set to True if want to update the plots each \"plot_rate\" steps (Very very slow, unfacible)
+  :vartype show_plot: bool 
+
+  :param plot_rate: Update plots each \"plot_rate\" steps 
+  :type plot_rate: int
 
   :var verbose: Set to true id want some text outputs 
   :vartype verbose: bool
@@ -52,6 +67,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
   render_rate : int
   verbose     : bool
 
+  world : dart.simulation.World
+  viewer : dart.gui.osg.Viewer
+  node : simulation.Hrp4Controller
+
   previous_states  : list[ dict[str, any  ] ]
   previous_actions : list[ dict[str, float] ]
   previous_rewards : list[ float            ]
@@ -60,8 +79,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
   def __init__(self, 
                name        : str  = 'hrp4', 
                max_step    : int  = 10_000,
-               render       : bool = True,
+               render      : bool = True,
                render_rate : int  = 5, 
+               show_plot   : bool = False,
+               plot_rate   : int  = 100,
                verbose     : bool = False):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
@@ -78,15 +99,25 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :param render_rate: Render the simulation each \"render_rate\" steps 
     :type render_rate: int
 
+    :param show_plot: Set to True if want to update the plots (very very slow option)
+    :type show_plot: bool 
+
+    :param plot_rate: Update plots each \"plot_rate\" steps 
+    :type plot_rate: int
+
     :param verbose: Set to true id want some text outputs 
     :type verbose: bool
+
+    :param 
     '''
     # init the name state and maximum steps for the simulations then reset the environment
-    self.name = name
-    self.max_steps = max_step
-    self.render_ = render
+    self.name        = name
+    self.max_steps   = max_step
+    self.render_     = render
     self.render_rate = render_rate
-    self.verbose = verbose
+    self.show_plot   = show_plot
+    self.plot_rate   = plot_rate
+    self.verbose     = verbose
 
     # size of the observatin and action spaces TO BE MODFIED
     self.obs_size = 1
@@ -133,7 +164,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     terminated = False                                # troncate because of unhelty conditions
     truncated = self.current_step > self.max_steps   # truncate the termination because to long
 
+    # render and plot updating
     self.render()
+    self.UpdatePlot()
+
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
 
@@ -148,7 +182,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: tuple [state: Any | info: dict[str, Any]]
     '''
 
-    self.world, self.viewer, self.node = simulation_setup(self.render_)
+    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_)
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
@@ -166,10 +200,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     return state_array, info
 
   def render(self) -> None:
+    '''
+    Method that call the render function for the simulation and update the plot
+    '''
     if self.verbose: print('Rendering the simulation')
-    if not self.render_: return
-    if self.current_step % self.render_rate == 0: 
-        self.viewer.frame()
+
+    if self.render_ and self.current_step % self.render_rate == 0: self.viewer.frame()
 
   def close(self) -> None:
     # notthing shuld be done for correctly close the environment
@@ -237,4 +273,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     return current_reward
 
-
+  def UpdatePlot(self) -> None:
+    '''
+    Method to update the plots at the current time (Very very slow) 
+    Suggest: not update frequently during the simulation
+    '''
+    if self.show_plot and  self.current_step % self.plot_rate == 0: 
+      self.node.logger.update_plot(self.node.time)
