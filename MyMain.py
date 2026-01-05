@@ -3,6 +3,7 @@ import MyWrapper
 from stable_baselines3 import PPO
 import gymnasium as gym
 import time
+import numpy as np
 
 def SB3_test() -> None:
     env = gym.make("InvertedPendulum-v5")
@@ -34,7 +35,7 @@ def main() -> None:
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True)
     #MyWrapper.ISMPC2gym_env_wrapper
 
-    model = PPO("MlpPolicy", env, verbose=1, device="cpu")
+    #model = PPO("MlpPolicy", env, verbose=1, device="cpu")
 
     # print("start training")
     # model.learn(total_timesteps=10)
@@ -47,7 +48,8 @@ def main() -> None:
         s, info = env.reset()
 
         for _ in range(1500):
-            action, _states = model.predict(s, deterministic=True)
+            #action, _states = model.predict(s, deterministic=True)
+            action = np.array([0.001, 0, 0]) # send action just to make the robot going forward
             s, r, term, trunc, info = env.step(action)
 
             if term or trunc: break

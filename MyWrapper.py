@@ -120,7 +120,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.verbose     = verbose
     # size of the observatin and action spaces TO BE MODFIED
     self.obs_size = 1
-    self.action_size = 1
+    self.action_size = 3 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
@@ -153,9 +153,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     terminated = False                                # troncate because of unhelty conditions
     try:
       # take a step in to the environment
-      if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 6:
-        self.node.footstep_planner.modify_plan(np.array([0.002, 0, 0.0])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time), np.array([0.0, 0.0, 0.0]), self.node.time)
-
+      self.ApplyAction(action_dict)
       self.node.customPreStep()
       self.world.step()
     except Exception as e:
@@ -259,13 +257,27 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # copute the current action as a dictionary
-    action_dict = np.zeros(self.action_size)
+    action_dict = {'Dx' : action[0],
+                   'Dy' : action[1],
+                   'Dth': action[2]}
 
     # add the current action dict to the list of previous actions
     self.previous_actions.append(action_dict)
 
     return action_dict
   
+  def ApplyAction(self, action_dict : dict[str, float]) -> None:
+    '''
+    Method for applyng the action to the environemnt. More in detail this method modify the footstep plan
+    according to the actions given.
+    
+    :param action_dict: The dictionary containing the displacements Dx, Dy and Dtheta
+    :type action_dict: dict[str, float]
+    '''
+    pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+    ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
+    self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
+
   def GetReward(self, state : dict[str, any], action : dict[str, float]) -> float:
     '''
     Method for computing the reward based on the state as dictionary, all the environment and the actions
