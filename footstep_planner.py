@@ -75,3 +75,10 @@ class FootstepPlanner:
             return 'ss'
         else:
             return 'ds'
+        
+    def modify_plan(self, D_pos, D_ang, time):
+        starting_index = self.get_step_index_at_time(time)
+
+        for i in range(starting_index, len(self.plan)):
+            self.plan[i]['pos'] += D_pos 
+            self.plan[i]['ang'] += D_ang
