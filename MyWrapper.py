@@ -118,7 +118,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.show_plot   = show_plot
     self.plot_rate   = plot_rate
     self.verbose     = verbose
-
     # size of the observatin and action spaces TO BE MODFIED
     self.obs_size = 1
     self.action_size = 1
@@ -128,11 +127,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.action_space      = gym.spaces.Box(low = -1     , high = 1     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     self.reset()
+    
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
   def step(self, action : np.array) -> tuple[np.array, float, bool, bool, dict[str, any]]:
     '''
-    Method for taking a stem in the environment performing the \"action\" and computing the reward.
+    Method for taking a step in the environment performing the \"action\" and computing the reward.
     
     :param action: The action that the agent want to take in the environemnt, in our case the deviation of the footsteps
     :ytpe action: np.array
@@ -149,9 +149,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # convert and use the action
     action_dict = self.PreprocessAction(action)
 
-    # take a step in to the environment
-    self.node.customPreStep()
-    self.world.step()
+    # get termination or truncation conditions
+    terminated = False                                # troncate because of unhelty conditions
+    try:
+      # take a step in to the environment
+      self.node.customPreStep()
+      self.world.step()
+    except:
+      terminated = True
 
     # collect the state and the reward
     state_array, state_dict = self.GetState()
@@ -160,13 +165,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # update the current step counter
     self.current_step += 1
 
-    # get termination or truncation conditions
-    terminated = False                                # troncate because of unhelty conditions
     truncated = self.current_step > self.max_steps   # truncate the termination because to long
 
     # render and plot updating
     self.render()
-    self.UpdatePlot()
+
+    # log and plot
+    if self.show_plot:
+      self.UpdatePlot()
 
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
@@ -183,6 +189,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_)
+    self.is_plot_init = False
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
@@ -278,5 +285,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     Method to update the plots at the current time (Very very slow) 
     Suggest: not update frequently during the simulation
     '''
-    if self.show_plot and  self.current_step % self.plot_rate == 0: 
-      self.node.logger.update_plot(self.node.time)
+    if not self.is_plot_init:
+      self.InitPlot()
+    self.node.logger.update_plot(self.node.time)
+    
+  def InitPlot(self) -> None:
+    self.node.logger.initialize_plot(frequency=10)
+    self.is_plot_init = True
+      

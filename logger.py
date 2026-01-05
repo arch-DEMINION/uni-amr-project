@@ -9,7 +9,6 @@ class Logger():
                 self.log['desired', item, level] = []
                 self.log['current', item, level] = []
 
-
     def log_data(self, desired, current):
         for item in desired.keys():
             for level in desired[item].keys():

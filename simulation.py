@@ -129,7 +129,6 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         # initialize logger and plots
         self.logger = Logger(self.initial)
-        self.logger.initialize_plot(frequency=10)
         
     def customPreStep(self):
         # create current and desired states
@@ -182,6 +181,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         # log and plot
         self.logger.log_data(self.current, self.desired)
+        # self.logger.update_plot(self.time)
 
         self.time += 1
 
@@ -295,15 +295,13 @@ def simulation_setup(render = True):
 
 
 if __name__ == "__main__":
-    world, viewer, node = simulation_setup(False)
-    # node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
-    # try: # ugly: catch footstep generation continuing beyond plan's end
-    #     viewer.run()
-    #     if step % 5 == 0: 
-    #         viewer.frame()
-    # except:
-    #     pass
-    # input()
+    world, viewer, node = simulation_setup()
+    node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
+    try: # ugly: catch footstep generation continuing beyond plan's end
+        viewer.run()
+    except:
+        pass
+    input()
     
     num_steps = 1000
 
@@ -311,6 +309,8 @@ if __name__ == "__main__":
         for step in range(num_steps):
             node.customPreStep()
             world.step()
+            # if step % 5 == 0: 
+            #     viewer.frame()
     except:
         pass
 

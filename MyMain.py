@@ -33,14 +33,16 @@ def main() -> None:
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True)
     #MyWrapper.ISMPC2gym_env_wrapper
 
-    model = PPO("MlpPolicy", env, verbose=1)
+    model = PPO("MlpPolicy", env, verbose=1, device="cpu")
 
     print("start training")
-    model.learn(total_timesteps=100)
+    model.learn(total_timesteps=10)
     print("end training")
+    #env.UpdatePlot()
 
     print("start simulations")
-    for _ in range(2):
+    for i in range(3):
+        print(f"simulation #{i}")
         s, info = env.reset()
 
         for _ in range(500):
@@ -48,6 +50,8 @@ def main() -> None:
             s, r, term, trunc, info = env.step(action)
 
             if term or trunc: break
+
+        env.UpdatePlot()
 
     input("finisched")
 
