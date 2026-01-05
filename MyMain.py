@@ -1,9 +1,8 @@
-import numpy as np
-
 import MyWrapper
 
 from stable_baselines3 import PPO
 import gymnasium as gym
+import time
 
 def SB3_test() -> None:
     env = gym.make("InvertedPendulum-v5")
@@ -35,11 +34,11 @@ def main() -> None:
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True)
     #MyWrapper.ISMPC2gym_env_wrapper
 
-    #model = PPO("MlpPolicy", env, verbose=1, device="cpu")
+    model = PPO("MlpPolicy", env, verbose=1, device="cpu")
 
-    #print("start training")
-    #model.learn(total_timesteps=10)
-    #print("end training")
+    # print("start training")
+    # model.learn(total_timesteps=10)
+    # print("end training")
     #env.UpdatePlot()
 
     print("start simulations")
@@ -47,19 +46,15 @@ def main() -> None:
         print(f"simulation #{i}")
         s, info = env.reset()
 
-        for _ in range(2):
-            #action, _states = model.predict(s, deterministic=True)
-            s, r, term, trunc, info = env.step(0)
-
-            env.node.footstep_planner.modify_plan(np.array([1, 1, 1]), np.array([1, 1, 1]), 200)
-            print(env.node.footstep_planner.plan[0:3])
-            print('\n')
+        for _ in range(1500):
+            action, _states = model.predict(s, deterministic=True)
+            s, r, term, trunc, info = env.step(action)
 
             if term or trunc: break
 
         env.UpdatePlot()
 
-    #input("finisched")
+    input("finisched")
 
 
 

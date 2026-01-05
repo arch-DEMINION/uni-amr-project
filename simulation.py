@@ -10,6 +10,7 @@ import filter
 import foot_trajectory_generator as ftg
 from logger import Logger
 import timeit
+from math import sin,cos
 
 
 class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
@@ -80,11 +81,12 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.id = id.InverseDynamics(self.hrp4, redundant_dofs)
 
         # initialize footstep planner
-        # reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
-        reference = [(0.1, 0., 0.2)] * 5  + [(0., 0., 0.)] * 100 
+        reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
+        # reference = [(0.0, 0., 0.0)] * 5  + [(0., 0., 0.)] * 100 
         #print(reference)
         #reference = [(0.1, 0., 0.)] * 5 + [(0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
 
+        self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
             reference,
             self.initial['lfoot']['pos'],
@@ -133,6 +135,64 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
     def customPreStep(self):
         # create current and desired states
         self.current = self.retrieve_state()
+        
+        for s in self.plan_skeleton:
+            self.world.removeSkeleton(s)
+        self.plan_skeleton.clear()
+
+        for i in range(len(self.footstep_planner.plan)):
+            step_skel = dart.dynamics.Skeleton(f"step_{i}")
+            step_skel.setGravity([0.0, 0.0, 0.0]) 
+            step_skel.setMobile(False)
+
+            joint, body = step_skel.createFreeJointAndBodyNodePair()
+            
+            joint.setName(f"step_{i}_joint")  
+            body.setName(f"step_{i}_body")  
+            # Create box shape  
+            shape = dart.dynamics.BoxShape([self.params['foot_size']*2.1, self.params['foot_size']*1.5, 0.0001])  
+            
+            # Create shape node with visual, collision, and dynamics aspects  
+            shape_node = body.createShapeNode(shape)  
+            # Create aspects separately  
+            visual = shape_node.createVisualAspect()  
+            #collision = shape_node.createCollisionAspect()  
+            #dynamics = shape_node.createDynamicsAspect()  
+            
+            # Set visual properties  
+            if i >= self.footstep_planner.get_step_index_at_time(self.time):
+                visual.setColor([1.0, 0.0, 0.0, 1.0])
+            else: 
+                visual.setColor([0.0, 0.0, 1.0, 1.0])
+                        
+            # Set initial position  
+            transform = dart.math.Isometry3()  
+            pos = self.footstep_planner.plan[i]['pos']
+            ang = self.footstep_planner.plan[i]['ang']
+            transform.set_translation([pos[0], pos[1], pos[2] +0.002])  
+
+            # https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+            cr = cos(ang[0] * 0.5);
+            sr = sin(ang[0] * 0.5);
+            cp = cos(ang[1] * 0.5);
+            sp = sin(ang[1] * 0.5);
+            cy = cos(ang[2] * 0.5);
+            sy = sin(ang[2] * 0.5);
+            qw = cr * cp * cy + sr * sp * sy;
+            qx = sr * cp * cy - cr * sp * sy;
+            qy = cr * sp * cy + sr * cp * sy;
+            qz = cr * cp * sy - sr * sp * cy;
+            transform.set_quaternion(dart.math.Quaternion([qw, qx, qy, qz]))
+
+            joint.setTransform(transform)  
+            
+            self.world.addSkeleton(step_skel)
+            self.plan_skeleton.append(step_skel)
+
+        # for i in range(len(self.plan_skeleton)):
+        #     if i < self.footstep_planner.get_step_index_at_time(self.time):
+        #         self.plan_skeleton[i][4].setColor([0.0, 0.0, 1.0, 0.2])
+
 
         # update kalman filter
         u = np.array([self.desired['zmp']['vel'][0], self.desired['zmp']['vel'][1], self.desired['zmp']['vel'][2]])
@@ -222,8 +282,10 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             zmp[1] += (contact.point[1] * contact.force[2] / force[2] + (zmp[2] - contact.point[2]) * contact.force[1] / force[2])
 
         if force[2] <= 0.1: # threshold for when we lose contact
+            #print(f"lost contact at time {self.time}")
             zmp = np.array([0., 0., 0.]) # FIXME: this should return previous measurement
         else:
+            #print(f"contact at time {self.time}")
             # sometimes we get contact points that dont make sense, so we clip the ZMP close to the robot
             midpoint = (l_foot_position + l_foot_position) / 2.
             zmp[0] = np.clip(zmp[0], midpoint[0] - 0.3, midpoint[0] + 0.3)

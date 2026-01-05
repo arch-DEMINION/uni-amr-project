@@ -75,9 +75,24 @@ class FootstepPlanner:
             return 'ss'
         else:
             return 'ds'
-        
+    
+    def get_remaining_time_in_swing(self, time):
+        step_index = self.get_step_index_at_time(time)
+        start_time = self.get_start_time(step_index)
+        time_in_step = time - start_time
+        return (self.plan[step_index]['ss_duration'] - time_in_step)
+    
+    def get_normalized_remaining_time_in_swing(self, time):
+        step_index = self.get_step_index_at_time(time)
+        return self.get_remaining_time_in_swing(time)/self.plan[step_index]['ss_duration']
+         
     def modify_plan(self, D_pos, D_ang, time):
-        starting_index = self.get_step_index_at_time(time)
+        # TODO: the RL agent should understand this
+        if self.get_phase_at_time(time) == 'ds':
+           return
+
+        # start one index later to avoid shifting the plan on the foot currently on the ground
+        starting_index = self.get_step_index_at_time(time) + 1
 
         for i in range(starting_index, len(self.plan)):
             self.plan[i]['pos'] += D_pos 

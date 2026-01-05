@@ -153,9 +153,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     terminated = False                                # troncate because of unhelty conditions
     try:
       # take a step in to the environment
+      if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 6:
+        self.node.footstep_planner.modify_plan(np.array([0.002, 0, 0.0])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time), np.array([0.0, 0.0, 0.0]), self.node.time)
+
       self.node.customPreStep()
       self.world.step()
-    except:
+    except Exception as e:
+      print("Failure during simulation")
+      print(e)
       terminated = True
 
     # collect the state and the reward
