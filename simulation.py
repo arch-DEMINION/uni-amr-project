@@ -135,59 +135,6 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
     def customPreStep(self):
         # create current and desired states
         self.current = self.retrieve_state()
-        
-        for s in self.plan_skeleton:
-            self.world.removeSkeleton(s)
-        self.plan_skeleton.clear()
-
-        for i in range(len(self.footstep_planner.plan)):
-            step_skel = dart.dynamics.Skeleton(f"step_{i}")
-            step_skel.setGravity([0.0, 0.0, 0.0]) 
-            step_skel.setMobile(False)
-
-            joint, body = step_skel.createFreeJointAndBodyNodePair()
-            
-            joint.setName(f"step_{i}_joint")  
-            body.setName(f"step_{i}_body")  
-            # Create box shape  
-            shape = dart.dynamics.BoxShape([self.params['foot_size']*2.1, self.params['foot_size']*1.5, 0.0001])  
-            
-            # Create shape node with visual, collision, and dynamics aspects  
-            shape_node = body.createShapeNode(shape)  
-            # Create aspects separately  
-            visual = shape_node.createVisualAspect()  
-            #collision = shape_node.createCollisionAspect()  
-            #dynamics = shape_node.createDynamicsAspect()  
-            
-            # Set visual properties  
-            if i >= self.footstep_planner.get_step_index_at_time(self.time):
-                visual.setColor([1.0, 0.0, 0.0, 1.0])
-            else: 
-                visual.setColor([0.0, 0.0, 1.0, 1.0])
-                        
-            # Set initial position  
-            transform = dart.math.Isometry3()  
-            pos = self.footstep_planner.plan[i]['pos']
-            ang = self.footstep_planner.plan[i]['ang']
-            transform.set_translation([pos[0], pos[1], pos[2] +0.002])  
-
-            # https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
-            cr = cos(ang[0] * 0.5);
-            sr = sin(ang[0] * 0.5);
-            cp = cos(ang[1] * 0.5);
-            sp = sin(ang[1] * 0.5);
-            cy = cos(ang[2] * 0.5);
-            sy = sin(ang[2] * 0.5);
-            qw = cr * cp * cy + sr * sp * sy;
-            qx = sr * cp * cy - cr * sp * sy;
-            qy = cr * sp * cy + sr * cp * sy;
-            qz = cr * cp * sy - sr * sp * cy;
-            transform.set_quaternion(dart.math.Quaternion([qw, qx, qy, qz]))
-
-            joint.setTransform(transform)  
-            
-            self.world.addSkeleton(step_skel)
-            self.plan_skeleton.append(step_skel)
 
         # for i in range(len(self.plan_skeleton)):
         #     if i < self.footstep_planner.get_step_index_at_time(self.time):
@@ -316,6 +263,60 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                       'vel': np.zeros(3),
                       'acc': np.zeros(3)}
         }
+    
+    def RenderFootsteps(self):
+        for s in self.plan_skeleton:
+            self.world.removeSkeleton(s)
+        self.plan_skeleton.clear()
+
+        for i in range(len(self.footstep_planner.plan)):
+            step_skel = dart.dynamics.Skeleton(f"step_{i}")
+            step_skel.setGravity([0.0, 0.0, 0.0]) 
+            step_skel.setMobile(False)
+
+            joint, body = step_skel.createFreeJointAndBodyNodePair()
+            
+            joint.setName(f"step_{i}_joint")  
+            body.setName(f"step_{i}_body")  
+            # Create box shape  
+            shape = dart.dynamics.BoxShape([self.params['foot_size']*2.1, self.params['foot_size']*1.5, 0.0001])  
+            
+            # Create shape node with visual, collision, and dynamics aspects  
+            shape_node = body.createShapeNode(shape)  
+            # Create aspects separately  
+            visual = shape_node.createVisualAspect()  
+            #collision = shape_node.createCollisionAspect()  
+            #dynamics = shape_node.createDynamicsAspect()  
+            
+            # Set visual properties  
+            if i >= self.footstep_planner.get_step_index_at_time(self.time):
+                visual.setColor([1.0, 0.0, 0.0, 1.0])
+            else: 
+                visual.setColor([0.0, 0.0, 1.0, 1.0])
+                        
+            # Set initial position  
+            transform = dart.math.Isometry3()  
+            pos = self.footstep_planner.plan[i]['pos']
+            ang = self.footstep_planner.plan[i]['ang']
+            transform.set_translation([pos[0], pos[1], pos[2] +0.002])  
+
+            # https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+            cr = cos(ang[0] * 0.5);
+            sr = sin(ang[0] * 0.5);
+            cp = cos(ang[1] * 0.5);
+            sp = sin(ang[1] * 0.5);
+            cy = cos(ang[2] * 0.5);
+            sy = sin(ang[2] * 0.5);
+            qw = cr * cp * cy + sr * sp * sy;
+            qx = sr * cp * cy - cr * sp * sy;
+            qy = cr * sp * cy + sr * cp * sy;
+            qz = cr * cp * sy - sr * sp * cy;
+            transform.set_quaternion(dart.math.Quaternion([qw, qx, qy, qz]))
+
+            joint.setTransform(transform)  
+            
+            self.world.addSkeleton(step_skel)
+            self.plan_skeleton.append(step_skel)
 
 def simulation_setup(render = True):
     world = dart.simulation.World()
