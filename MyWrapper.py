@@ -198,7 +198,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
-    self.previous_actions = []
+    self.previous_actions = [
+                  {'Dx' : 0.,
+                   'Dy' : 0.,
+                   'Dth': 0.}]
     self.previous_rewards = []
 
     # reset the states and steps
@@ -222,7 +225,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.viewer.frame()
 
   def close(self) -> None:
-    # notthing shuld be done for correctly close the environment
+    # nothing should be done for correctly close the environment
     print('Environment closed, to be implemented')
 
 # UTILS METHODS FOR EXTRACTING INFORMATION FROM THE ENVIRONEMNT AND PROCESS DATA
@@ -239,9 +242,58 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: tuple[np.array, dict[str, Any]]
     '''
 
+    # shorthands
+    step_index = self.node.footstep_planner.get_step_index_at_time(self.node.time)
+    plan = self.node.footstep_planner.plan
+    # which foot is used for support (\sigma_k)
+    support_foot = 1 if plan[step_index]['foot_id'] == 'rfoot' else -1
+    pivot = self.node.lsole if support_foot == 'lfoot' else self.node.rsole
+    # remaining time in swing (\T_r_k)
+    remaining_time = self.node.footstep_planner.get_remaining_time_in_swing(self.node.time)
+    # ISMPC state (com, zmp, torso, base, feet, position and velocity)
+    ismpc_state = self.node.retrieve_state(pivot)
+    com_pos = ismpc_state['com']['pos']
+    
+    # mass, gravity, angular momentum of the centroidal dynamics around the support pivot
+    mass = self.node.hrp4.getMass()
+    g = self.node.params['g']
+
+    # # angular momentum about support pivot
+    L = self.node.compute_angular_momentum(pivot.getTransform().translation())
+    # derivatives of angular momentum
+    Ldot_x = -mass*g*com_pos[1]
+    Ldot_y = mass*g*com_pos[0]
+    Ldot = np.array([Ldot_x, Ldot_y])
+
+    # position of support foot
+    support_foot_pos = plan[step_index]['pos']
+    # position of next footstep (taken by foot opposing the current support foot)
+    next_footstep_pos = plan[step_index + 1]['pos']
+    # position of next footstep that will be taken by the current support foot
+    # (second footstep from now)
+    support_foot_next_pos = plan[step_index + 2]['pos']
+
     # compute the state as a np.array and as a dictionary
-    state_array = np.zeros(self.obs_size)
-    state_dict = None
+    state_dict = {
+      'support_foot': np.array([support_foot]),
+      'remaining_time': np.array([remaining_time]),
+      'com_pos':  ismpc_state['com']['pos'],
+      'com_vel':  ismpc_state['com']['vel'],
+      'zmp_pos':  ismpc_state['zmp']['pos'],
+      'zmp_vel':  ismpc_state['zmp']['vel'],
+      'torso_orient': ismpc_state['torso']['pos'],
+      'torso_angvel': ismpc_state['torso']['vel'],
+      'base_orient': ismpc_state['base']['pos'],
+      'base_angvel': ismpc_state['base']['vel'],
+      'zmp_pos_desired': self.node.desired['zmp']['pos'],
+      'angular_momentum': L,
+      'angular_momentum_drv': Ldot,
+      'support_foot_pos': support_foot_pos,
+      'support_foot_next_pos': support_foot_next_pos,
+      'next_footstep_pos': next_footstep_pos,
+      'previous_action': list(self.previous_actions[-1].values())
+    }
+    state_array = np.concatenate(list(state_dict.values()))
 
     # store the new state dict in the list of previous states
     self.previous_states.append(state_dict)
@@ -260,7 +312,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: dict[str, float]
     '''
 
-    # copute the current action as a dictionary
+    # compute the current action as a dictionary
     action_dict = {'Dx' : action[0],
                    'Dy' : action[1],
                    'Dth': action[2]}

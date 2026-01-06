@@ -192,28 +192,34 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         self.time += 1
 
-    def retrieve_state(self):
+    def compute_angular_momentum(self, pivot=np.zeros(3)):
+        L = np.zeros(3)
+        for b in self.hrp4.getBodyNodes():
+            L += b.getAngularMomentum(pivot)
+        return L
+
+    def retrieve_state(self, frame=dart.dynamics.Frame.World()):
         # com and torso pose (orientation and position)
-        com_position = self.hrp4.getCOM()
-        torso_orientation = get_rotvec(self.hrp4.getBodyNode('torso').getTransform(withRespectTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World()).rotation())
-        base_orientation  = get_rotvec(self.hrp4.getBodyNode('body' ).getTransform(withRespectTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World()).rotation())
+        com_position = self.hrp4.getCOM(withRespectTo=frame)
+        torso_orientation = get_rotvec(self.hrp4.getBodyNode('torso').getTransform(withRespectTo=frame, inCoordinatesOf=frame).rotation())
+        base_orientation  = get_rotvec(self.hrp4.getBodyNode('body' ).getTransform(withRespectTo=frame, inCoordinatesOf=frame).rotation())
 
         # feet poses (orientation and position)
-        l_foot_transform = self.lsole.getTransform(withRespectTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World())
+        l_foot_transform = self.lsole.getTransform(withRespectTo=frame, inCoordinatesOf=frame)
         l_foot_orientation = get_rotvec(l_foot_transform.rotation())
         l_foot_position = l_foot_transform.translation()
         left_foot_pose = np.hstack((l_foot_orientation, l_foot_position))
-        r_foot_transform = self.rsole.getTransform(withRespectTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World())
+        r_foot_transform = self.rsole.getTransform(withRespectTo=frame, inCoordinatesOf=frame)
         r_foot_orientation = get_rotvec(r_foot_transform.rotation())
         r_foot_position = r_foot_transform.translation()
         right_foot_pose = np.hstack((r_foot_orientation, r_foot_position))
 
         # velocities
-        com_velocity = self.hrp4.getCOMLinearVelocity(relativeTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World())
-        torso_angular_velocity = self.hrp4.getBodyNode('torso').getAngularVelocity(relativeTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World())
-        base_angular_velocity = self.hrp4.getBodyNode('body').getAngularVelocity(relativeTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World())
-        l_foot_spatial_velocity = self.lsole.getSpatialVelocity(relativeTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World())
-        r_foot_spatial_velocity = self.rsole.getSpatialVelocity(relativeTo=dart.dynamics.Frame.World(), inCoordinatesOf=dart.dynamics.Frame.World())
+        com_velocity = self.hrp4.getCOMLinearVelocity(relativeTo=frame, inCoordinatesOf=frame)
+        torso_angular_velocity = self.hrp4.getBodyNode('torso').getAngularVelocity(relativeTo=frame, inCoordinatesOf=frame)
+        base_angular_velocity = self.hrp4.getBodyNode('body').getAngularVelocity(relativeTo=frame, inCoordinatesOf=frame)
+        l_foot_spatial_velocity = self.lsole.getSpatialVelocity(relativeTo=frame, inCoordinatesOf=frame)
+        r_foot_spatial_velocity = self.rsole.getSpatialVelocity(relativeTo=frame, inCoordinatesOf=frame)
 
         # compute total contact force
         force = np.zeros(3)
