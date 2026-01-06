@@ -49,7 +49,7 @@ def main() -> None:
 
         for _ in range(1500):
             #action, _states = model.predict(s, deterministic=True)
-            action = np.array([0.001, 0, 0]) # send action just to make the robot going forward
+            action = np.array([0.001, 0, 0.0]) # send action just to make the robot going forward
             s, r, term, trunc, info = env.step(action)
 
             if term or trunc: break

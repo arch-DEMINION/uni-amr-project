@@ -278,6 +278,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :param action_dict: The dictionary containing the displacements Dx, Dy and Dtheta
     :type action_dict: dict[str, float]
     '''
+
+    # to be removed the modulation of the displacement
     pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
