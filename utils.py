@@ -1,6 +1,7 @@
 import casadi as ca
 from scipy.spatial.transform import Rotation as R
 import numpy as np
+from numpy import sin,cos
 
 def rotation_vector_difference(rotvec_a, rotvec_b):
     R_a = R.from_rotvec(rotvec_a)
@@ -90,3 +91,27 @@ class QPSolver:
             print("QP Solver failed:", e)
             x_sol = np.zeros(self.n_vars)
         return x_sol
+    
+def Euler2Quaternion(PHI : list[float, float, float]) -> list[float, float, float, float]:
+    '''
+    Utils function that take in input three Ruler angles x, y, z and convert in quaternion rappresentation
+    
+    :param PHI: PHI = [x, y, z] The parametrizzation of euler angles 
+    :type x: float, float, float
+    :return: The equivalent quaternion rappresentation
+    :rtype: list[float]
+    '''
+
+    # https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+    cr = cos(PHI[0] * 0.5);
+    sr = sin(PHI[0] * 0.5);
+    cp = cos(PHI[1] * 0.5);
+    sp = sin(PHI[1] * 0.5);
+    cy = cos(PHI[2] * 0.5);
+    sy = sin(PHI[2] * 0.5);
+    qw = cr * cp * cy + sr * sp * sy;
+    qx = sr * cp * cy - cr * sp * sy;
+    qy = cr * sp * cy + sr * cp * sy;
+    qz = cr * cp * sy - sr * sp * cy;
+
+    return [qw, qx, qy, qz]

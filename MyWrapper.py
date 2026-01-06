@@ -153,7 +153,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     terminated = False                                # troncate because of unhelty conditions
     try:
       # take a step in to the environment
-      self.ApplyAction(action_dict)
+      if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 1: # start to modify after the 6 step of the robot
+        self.ApplyAction(action_dict)
+
       self.node.customPreStep()
       self.world.step()
     except Exception as e:
@@ -215,7 +217,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
     if self.verbose: print('Rendering the simulation')
 
-    if self.render_ and self.current_step % self.render_rate == 0: self.viewer.frame()
+    if self.render_ and self.current_step % self.render_rate == 0: 
+      self.node.RenderFootsteps()
+      self.viewer.frame()
 
   def close(self) -> None:
     # notthing shuld be done for correctly close the environment
@@ -309,4 +313,5 @@ class ISMPC2gym_env_wrapper(gym.Env):
   def InitPlot(self) -> None:
     self.node.logger.initialize_plot(frequency=10)
     self.is_plot_init = True
-      
+
+    
