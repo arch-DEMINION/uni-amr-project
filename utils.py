@@ -115,3 +115,20 @@ def Euler2Quaternion(PHI : list[float, float, float]) -> list[float, float, floa
     qz = cr * cp * sy - sr * sp * cy;
 
     return [qw, qx, qy, qz]
+
+def Ker(e : float, sigma_v : float, weight : float) -> float:
+    '''
+    Function to compute the Ker_v(e) function to be used in the reward function:
+    Ker_v(e) = w*exp(-(e/sigma_v)^2)
+    
+    :param e: The error paramether
+    :type e: float
+    :param sigma_v: The standerd deviation of the distribution v where the error is sampled
+    :type sigma_v: float
+    :param weight: Weight of importance
+    :type weight: float
+    :return: The corrisponding reward
+    :rtype: float
+    '''
+
+    return weight*np.exp( -np.pow(e/sigma_v, 2) )
