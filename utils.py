@@ -131,4 +131,4 @@ def Ker(e : float, sigma_v : float, weight : float) -> float:
     :rtype: float
     '''
 
-    return weight*np.exp( -np.pow(e/sigma_v, 2) )
+    return weight*np.exp( -np.pow(e/sigma_v + 1e-8, 2) )
