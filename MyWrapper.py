@@ -118,15 +118,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.show_plot   = show_plot
     self.plot_rate   = plot_rate
     self.verbose     = verbose
-    # size of the observatin and action spaces TO BE MODFIED
-    self.obs_size = 1
+
+    self.reset()
+
+    # size of the observatin and action spaces
+    self.obs_size = len(self.GetState()[0]) # automatically take the length of the state
     self.action_size = 3 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
     self.action_space      = gym.spaces.Box(low = -1     , high = 1     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
-
-    self.reset()
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -198,10 +199,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
-    self.previous_actions = [
-                  {'Dx' : 0.,
-                   'Dy' : 0.,
-                   'Dth': 0.}]
+    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0.} ]
     self.previous_rewards = []
 
     # reset the states and steps
