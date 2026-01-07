@@ -59,6 +59,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
   :var previous_rewards: List of all the previous rewards for the actor
   :vartype previous_rewards: list[float] 
+
+  :var REWARD_FUNC_CONSTANTS: Dictionary containing all the constants needed for computing the reward function
+  :vartype REWARD_FUNC_CONSTANTS: dict[str, float] 
   '''
 
   name        : str
@@ -74,6 +77,26 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_states  : list[ dict[str, any  ] ]
   previous_actions : list[ dict[str, float] ]
   previous_rewards : list[ float            ]
+
+  REWARD_FUNC_CONSTANTS = {
+          'r_alive' : 5.0,
+    
+            'w_ZmP' : 0.3,
+        'sigma_ZmP' : 0.1,
+        'w_ZmP_dot' : 0.3,
+    'sigma_ZmP_dot' : 0.1,
+    
+          'w_gamma' : 1.0,
+      'sigma_gamma' : 0.8,
+    
+             'w_ZH' : 1.0,
+            'w_phi' : 1.0,
+
+         'w_smooth' : 1.0,
+     'sigma_smooth' : 0.1,
+
+     'CoM_H_perc_safe' : 0.1
+  }
 
 
   def __init__(self, 
@@ -128,8 +151,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
     self.action_space      = gym.spaces.Box(low = -1     , high = 1     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
-
-    self.reset()
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -202,10 +223,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
-    self.previous_actions = [
-                  {'Dx' : 0.,
-                   'Dy' : 0.,
-                   'Dth': 0.}]
+    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0.}]
     self.previous_rewards = []
 
     # reset the states and steps
@@ -355,22 +373,20 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # compute the current reward
     current_reward = 0.0
     
+    # if not enough state for compute the reward return 0
     if len(self.previous_states) < 2:
-      
-      print("Not enough states to compute the reward, returning 0")
+      if self.verbose: print("Not enough states to compute the reward, returning 0")
       return current_reward
 
+    # if not in safe set reward = 0 and return
     if not self.Is_in_Safe_Set(state):
-      
+      print("Not in safe set for reward")
       self.previous_rewards.append(current_reward)
       return current_reward
 
-    elif self.Is_in_Safe_Set(state) and state["support_foot"][0] == self.previous_states[-2]["support_foot"][0]:
-      
-      current_reward += self.R_sw(state, action)
-      
+    if state["support_foot"][0] == self.previous_states[-2]["support_foot"][0]: 
+      current_reward += self.R_sw(state, action)  
     else:
-      
       current_reward += self.R_end(state, action)
 
     # add the current reward to the list of previous rewards
@@ -406,26 +422,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
     safe_ZmP = False
     
     # CoM constraints
-    
-    Com_Lb = (self.node.mpc.h - self.node.mpc.h/10)
-    Com_Up = (self.node.mpc.h + self.node.mpc.h/10)
+    Com_Lb = (self.node.mpc.h - self.node.mpc.h * self.REWARD_FUNC_CONSTANTS['CoM_H_perc_safe'])
+    Com_Up = (self.node.mpc.h + self.node.mpc.h * self.REWARD_FUNC_CONSTANTS['CoM_H_perc_safe'])
 
-    if state['com_pos'][2] >= Com_Lb and state['com_pos'][2] < Com_Up:
-      safe_CoM = True
-    else:
-      safe_CoM = False
+    safe_CoM = state['com_pos'][2] >= Com_Lb and state['com_pos'][2] < Com_Up
 
     # zmp constraints
-
-    if (state['zmp_pos'][0] <= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-       (state['zmp_pos'][0] >= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
-       (state['zmp_pos'][1] <= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-       (state['zmp_pos'][1] >= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
-       (state['zmp_pos'][2] <= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-       (state['zmp_pos'][2] >= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] - self.node.params['foot_size'] / 2.):
-      safe_ZmP = True
-    else:
-      safe_ZmP = False
+    safe_ZmP = (state['zmp_pos'][0] <= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+               (state['zmp_pos'][0] >= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
+               (state['zmp_pos'][1] <= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+               (state['zmp_pos'][1] >= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
+               (state['zmp_pos'][2] <= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+               (state['zmp_pos'][2] >= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] - self.node.params['foot_size'] / 2.)
 
     return safe_CoM and safe_ZmP
   
@@ -439,37 +447,25 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The reward for the swing phase
     :rtype: float
     '''
-    r_alive = 5.0
     
-    w_ZmP = 0.3
-    sigma_ZmP = 0.1
-    w_ZmP_dot = 0.3
-    sigma_ZmP_dot = 0.1
-    
-    w_gamma = 1.0
-    sigma_gamma = 0.8
-    
-    w_ZH = 1.0
-    w_phi = 1.0
-    
-    r_ZmP_x = Ker(state['zmp_pos'][0] - state['zmp_pos_desired'][0], sigma_ZmP, w_ZmP)
-    r_ZmP_y = Ker(state['zmp_pos'][1] - state['zmp_pos_desired'][1], sigma_ZmP, w_ZmP)
-    r_ZmP_z = Ker(state['zmp_pos'][2] - state['zmp_pos_desired'][2], sigma_ZmP, w_ZmP)
+    r_ZmP_x = Ker(state['zmp_pos'][0] - state['zmp_pos_desired'][0], self.REWARD_FUNC_CONSTANTS['sigma_ZmP'], self.REWARD_FUNC_CONSTANTS['w_ZmP'])
+    r_ZmP_y = Ker(state['zmp_pos'][1] - state['zmp_pos_desired'][1], self.REWARD_FUNC_CONSTANTS['sigma_ZmP'], self.REWARD_FUNC_CONSTANTS['w_ZmP'])
+    r_ZmP_z = Ker(state['zmp_pos'][2] - state['zmp_pos_desired'][2], self.REWARD_FUNC_CONSTANTS['sigma_ZmP'], self.REWARD_FUNC_CONSTANTS['w_ZmP'])
 
-    r_ZmP_dot_x = Ker(state['zmp_vel'][0] - state['zmp_vel_desired'][0], sigma_ZmP_dot, w_ZmP_dot)
-    r_ZmP_dot_y = Ker(state['zmp_vel'][1] - state['zmp_vel_desired'][1], sigma_ZmP_dot, w_ZmP_dot)
-    r_ZmP_dot_z = Ker(state['zmp_vel'][2] - state['zmp_vel_desired'][2], sigma_ZmP_dot, w_ZmP_dot)
+    r_ZmP_dot_x = Ker(state['zmp_vel'][0] - state['zmp_vel_desired'][0], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
+    r_ZmP_dot_y = Ker(state['zmp_vel'][1] - state['zmp_vel_desired'][1], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
+    r_ZmP_dot_z = Ker(state['zmp_vel'][2] - state['zmp_vel_desired'][2], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
     
-    r_gamma = Ker(state['torso_orient'][2] - state['zmp_pos_desired'][0], sigma_gamma, w_gamma)
+    r_gamma = Ker(state['torso_orient'][2] - state['zmp_pos_desired'][0], self.REWARD_FUNC_CONSTANTS['sigma_gamma'],self.REWARD_FUNC_CONSTANTS['w_gamma'])
     
-    r_ZH = - w_ZH * np.abs(state['com_pos'][2] - self.node.mpc.h)
-    r_phi = - w_phi * np.linalg.norm(state['zmp_pos'][0:1], ord=2)
+    r_ZH  = - self.REWARD_FUNC_CONSTANTS['w_ZH'] * np.abs(state['com_pos'][2] - self.node.mpc.h)
+    r_phi = - self.REWARD_FUNC_CONSTANTS['w_phi'] * np.linalg.norm(state['zmp_pos'][0:1], ord=2)
 
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
     
 
-    return r_alive + r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi
+    return self.REWARD_FUNC_CONSTANTS['r_alive'] + r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi
   
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
@@ -482,18 +478,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
     if state["previous_action"] is None:
-      
-      print("Not enough actions to compute the reward, returning 0")
+      if self.verbose: print("Not enough actions to compute the reward, returning 0")
       return 0.0
     
     current_action = np.array([action['Dx'], action['Dy'], action['Dth']])
     previous_action = np.array(state["previous_action"])
     
     e_smooth = current_action - previous_action
-    w_smooth = 1.0
-    sigma_smooth = 0.1
-    r_smooth1 = Ker(e_smooth[0], sigma_smooth, w_smooth)
-    r_smooth2 = Ker(e_smooth[1], sigma_smooth, w_smooth)
-    r_smooth3 = Ker(e_smooth[2], sigma_smooth, w_smooth)
+
+    r_smooth1 = Ker(e_smooth[0], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
+    r_smooth2 = Ker(e_smooth[1], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
+    r_smooth3 = Ker(e_smooth[2], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
 
     return r_smooth1 + r_smooth2 + r_smooth3
