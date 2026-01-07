@@ -95,7 +95,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 1.0,
      'sigma_smooth' : 0.1,
 
-     'CoM_H_perc_safe' : 0.1
+    'terminated_penalty' : -10,
+    'CoM_H_perc_safe' : 0.1
   }
 
 
@@ -189,8 +190,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # collect the state and the reward
     state_array, state_dict = self.GetState()
-    reward = self.GetReward(state_dict, action_dict)
-    print("Reward: "+ str(reward))
+    reward = self.GetReward(state_dict, action_dict, terminated)
+    #print("Reward: "+ str(reward))
 
     # update the current step counter
     self.current_step += 1
@@ -281,14 +282,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
     g = self.node.params['g']
 
     # # angular momentum about support pivot
-    L = self.node.compute_angular_momentum(pivot.getTransform().translation())
+    L = self.node.compute_angular_momentum(pivot.getTransform(pivot).translation())
     # derivatives of angular momentum
     Ldot_x = -mass*g*com_pos[1]
     Ldot_y = mass*g*com_pos[0]
     Ldot = np.array([Ldot_x, Ldot_y])
 
     # position of support foot
-    support_foot_pos = plan[step_index]['pos']
+    support_foot_pos = self.node.retrieve_state()[plan[step_index]['foot_id']]['pos'] #plan[step_index]['pos']
+    support_foot_pos = np.array([support_foot_pos[i] for i in [3, 4, 2]]) # shape as [x, y, theta]
+
     # position of next footstep (taken by foot opposing the current support foot)
     next_footstep_pos = plan[step_index + 1]['pos']
     # position of next footstep that will be taken by the current support foot
@@ -312,8 +315,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'angular_momentum': L,
       'angular_momentum_drv': Ldot,
       'support_foot_pos': support_foot_pos,
-      'support_foot_next_pos': support_foot_next_pos,
-      'next_footstep_pos': next_footstep_pos,
+      'support_foot_next_pos': support_foot_next_pos - support_foot_pos, # made relative to the support foot
+      'next_footstep_pos': next_footstep_pos - support_foot_pos, # made relative to the support foot
       'previous_action': list(self.previous_actions[-1].values())
     }
     state_array = np.concatenate(list(state_dict.values()))
@@ -355,11 +358,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # to be removed the modulation of the displacement
-    pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+    pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])#*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
 
-  def GetReward(self, state : dict[str, any], action : dict[str, float]) -> float:
+  def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
     '''
     Method for computing the reward based on the state as dictionary, all the environment and the actions
     
@@ -367,11 +370,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :type state: dict[str, any]
     :param action: The current action as a dictionary that store all the interesting actions indicized using strings
     :type action: dict[str, float]
+    :param terminated: The termination state of the robot
+    :type terminated: bool
     :return: Description
     :rtype: float
     '''
     # compute the current reward
-    current_reward = 0.0
+    current_reward = 0.0 + self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * terminated
     
     # if not enough state for compute the reward return 0
     if len(self.previous_states) < 2:
@@ -428,18 +433,25 @@ class ISMPC2gym_env_wrapper(gym.Env):
     safe_CoM = state['com_pos'][2] >= Com_Lb and state['com_pos'][2] < Com_Up
 
     # zmp constraints
-    safe_ZmP_x = (state['zmp_pos'][0] <= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-                  (state['zmp_pos'][0] >= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] - self.node.params['foot_size'] / 2.) 
-    safe_ZmP_y = (state['zmp_pos'][1] <= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-               (state['zmp_pos'][1] >= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] - self.node.params['foot_size'] / 2.)
-    safe_ZmP_z = (state['zmp_pos'][2] <= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-               (state['zmp_pos'][2] >= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] - self.node.params['foot_size'] / 2.)
-    safe_ZmP = safe_ZmP_x and safe_ZmP_y and safe_ZmP_z
+    #safe_ZmP_x = (state['zmp_pos'][0] <= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+                 #(state['zmp_pos'][0] >= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] - self.node.params['foot_size'] / 2.) 
+    #safe_ZmP_y = (state['zmp_pos'][1] <= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+                 #(state['zmp_pos'][1] >= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] - self.node.params['foot_size'] / 2.)
+    #safe_ZmP_z = (state['zmp_pos'][2] <= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+                 #(state['zmp_pos'][2] >= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] - self.node.params['foot_size'] / 2.)
+    
+    safe_ZmP_x = (state['zmp_pos'][0] <= state['support_foot_pos'][0] + self.node.params['foot_size'] / 2.) and \
+                 (state['zmp_pos'][0] >= state['support_foot_pos'][0] - self.node.params['foot_size'] / 2.) 
+    safe_ZmP_y = (state['zmp_pos'][1] <= state['support_foot_pos'][1] + self.node.params['foot_size'] / 2.) and \
+                 (state['zmp_pos'][1] >= state['support_foot_pos'][1] - self.node.params['foot_size'] / 2.)
+    safe_ZmP_z = True
+    safe_ZmP = True #safe_ZmP_x and safe_ZmP_y and safe_ZmP_z
                
     safe = safe_CoM and safe_ZmP
     if not safe:
       print(f"com safe: {safe_CoM}, zmp safe: {safe_ZmP_x},{safe_ZmP_y},{safe_ZmP_z}")
-    return 
+    
+    return safe
   
   
   def R_sw(self, state : dict[str, any],action : dict[str, float]) -> float:

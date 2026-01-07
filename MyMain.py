@@ -38,7 +38,7 @@ def main() -> None:
     model = PPO("MlpPolicy", env, verbose=1, device="cpu")
 
     print("start training")
-    model.learn(total_timesteps=10000)
+    model.learn(total_timesteps=10_000)
     model.save("ppo_hrp4")
     print("end training")
     #env.UpdatePlot()
@@ -49,8 +49,8 @@ def main() -> None:
         s, info = env.reset()
 
         for _ in range(1500):
-            #action, _states = model.predict(s, deterministic=True)
-            action = np.array([0.001, 0, 0.0]) # send action just to make the robot going forward
+            action, _states = model.predict(s, deterministic=True)
+            #action = np.array([0.001, 0, 0.0]) # send action just to make the robot going forward
             s, r, term, trunc, info = env.step(action)
 
             if term or trunc: break
