@@ -118,8 +118,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.show_plot   = show_plot
     self.plot_rate   = plot_rate
     self.verbose     = verbose
-    # size of the observation and action spaces TO BE MODFIED
-    self.obs_size = 1
+    
+    self.reset()
+
+    # size of the observation and action spaces
+    self.obs_size = len(self.GetState()[0]) # automatically take the length of the state
     self.action_size = 3 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
     
     # define the observation and action spaces as box without range
