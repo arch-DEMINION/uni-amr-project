@@ -118,7 +118,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.show_plot   = show_plot
     self.plot_rate   = plot_rate
     self.verbose     = verbose
-    # size of the observatin and action spaces TO BE MODFIED
+    # size of the observation and action spaces TO BE MODFIED
     self.obs_size = 1
     self.action_size = 3 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
     
@@ -166,6 +166,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # collect the state and the reward
     state_array, state_dict = self.GetState()
     reward = self.GetReward(state_dict, action_dict)
+    print("\nReward: "+ str(reward))
 
     # update the current step counter
     self.current_step += 1
@@ -286,6 +287,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'base_orient': ismpc_state['base']['pos'],
       'base_angvel': ismpc_state['base']['vel'],
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
+      'zmp_vel_desired': self.node.desired['zmp']['vel'],
       'angular_momentum': L,
       'angular_momentum_drv': Ldot,
       'support_foot_pos': support_foot_pos,
@@ -348,7 +350,25 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
     # compute the current reward
-    current_reward = 0
+    current_reward = 0.0
+    
+    if len(self.previous_states) < 2:
+      
+      print("Not enough states to compute the reward, returning 0")
+      return current_reward
+
+    if not self.Is_in_Safe_Set(state):
+      
+      self.previous_rewards.append(current_reward)
+      return current_reward
+
+    elif self.Is_in_Safe_Set(state) and state["support_foot"][0] == self.previous_states[-2]["support_foot"][0]:
+      
+      current_reward += self.R_sw(state, action)
+      
+    else:
+      
+      current_reward += self.R_end(state, action)
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
@@ -367,5 +387,110 @@ class ISMPC2gym_env_wrapper(gym.Env):
   def InitPlot(self) -> None:
     self.node.logger.initialize_plot(frequency=10)
     self.is_plot_init = True
-
     
+    
+  def Is_in_Safe_Set(self, state : dict[str, any]) -> bool:
+    
+    '''
+    Method that check if the current state is in the safe set S
+
+    :param state: The current state as a dictionary containing all the interesting therms indicized using strings
+    :type state: dict[str, any]
+    :return: True if the state is in the safe set, False otherwise
+    :rtype: bool
+    '''
+    safe_CoM = False
+    safe_ZmP = False
+    
+    # CoM constraints
+    
+    Com_Lb = (self.node.mpc.h - self.node.mpc.h/10)
+    Com_Up = (self.node.mpc.h + self.node.mpc.h/10)
+
+    if state['com_pos'][2] >= Com_Lb and state['com_pos'][2] < Com_Up:
+      safe_CoM = True
+    else:
+      safe_CoM = False
+
+    # zmp constraints
+
+    if (state['zmp_pos'][0] <= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+       (state['zmp_pos'][0] >= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
+       (state['zmp_pos'][1] <= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+       (state['zmp_pos'][1] >= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
+       (state['zmp_pos'][2] <= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+       (state['zmp_pos'][2] >= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] - self.node.params['foot_size'] / 2.):
+      safe_ZmP = True
+    else:
+      safe_ZmP = False
+
+    return safe_CoM and safe_ZmP
+  
+  
+  def R_sw(self, state : dict[str, any],action : dict[str, float]) -> float:
+    '''
+    Reward function for the swing phase
+
+    :param state: The current state as a dictionary containing all the interesting therms indicized using strings
+    :type state: dict[str, any]
+    :return: The reward for the swing phase
+    :rtype: float
+    '''
+    r_alive = 5.0
+    
+    w_ZmP = 0.3
+    sigma_ZmP = 0.1
+    w_ZmP_dot = 0.3
+    sigma_ZmP_dot = 0.1
+    
+    w_gamma = 1.0
+    sigma_gamma = 0.8
+    
+    w_ZH = 1.0
+    w_phi = 1.0
+    
+    r_ZmP_x = Ker(state['zmp_pos'][0] - state['zmp_pos_desired'][0], sigma_ZmP, w_ZmP)
+    r_ZmP_y = Ker(state['zmp_pos'][1] - state['zmp_pos_desired'][1], sigma_ZmP, w_ZmP)
+    r_ZmP_z = Ker(state['zmp_pos'][2] - state['zmp_pos_desired'][2], sigma_ZmP, w_ZmP)
+
+    r_ZmP_dot_x = Ker(state['zmp_vel'][0] - state['zmp_vel_desired'][0], sigma_ZmP_dot, w_ZmP_dot)
+    r_ZmP_dot_y = Ker(state['zmp_vel'][1] - state['zmp_vel_desired'][1], sigma_ZmP_dot, w_ZmP_dot)
+    r_ZmP_dot_z = Ker(state['zmp_vel'][2] - state['zmp_vel_desired'][2], sigma_ZmP_dot, w_ZmP_dot)
+    
+    r_gamma = Ker(state['torso_orient'][2] - state['zmp_pos_desired'][0], sigma_gamma, w_gamma)
+    
+    r_ZH = - w_ZH * np.abs(state['com_pos'][2] - self.node.mpc.h)
+    r_phi = - w_phi * np.linalg.norm(state['zmp_pos'][0:1], ord=2)
+
+    r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
+    r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
+    
+
+    return r_alive + r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi
+  
+  
+  def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
+    '''
+    Reward function for the end of the step
+
+    :param state: The current state as a dictionary containing all the interesting therms indicized using strings
+    :type state: dict[str, any]
+    :return: The reward for the end of the step
+    :rtype: float
+    '''
+    if state["previous_action"] is None:
+      
+      print("Not enough actions to compute the reward, returning 0")
+      return 0.0
+    
+    current_action = np.array([action['Dx'], action['Dy'], action['Dth']])
+    previous_action = np.array(state["previous_action"])
+    
+    e_smooth = current_action - previous_action
+    w_smooth = 1.0
+    sigma_smooth = 0.1
+    r_smooth1 = Ker(e_smooth[0], sigma_smooth, w_smooth)
+    r_smooth2 = Ker(e_smooth[1], sigma_smooth, w_smooth)
+    r_smooth3 = Ker(e_smooth[2], sigma_smooth, w_smooth)
+
+    return r_smooth1 + r_smooth2 + r_smooth3

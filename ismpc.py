@@ -86,12 +86,12 @@ class Ismpc:
     self.opt.set_value(self.zmp_y_mid_param, mc_y)
     self.opt.set_value(self.zmp_z_mid_param, mc_z)
 
-    sol = self.opt.solve()
-    self.x = sol.value(self.X[:,1])
-    self.u = sol.value(self.U[:,0])
+    self.sol = self.opt.solve()
+    self.x = self.sol.value(self.X[:,1])
+    self.u = self.sol.value(self.U[:,0])
 
-    self.opt.set_initial(self.U, sol.value(self.U))
-    self.opt.set_initial(self.X, sol.value(self.X))
+    self.opt.set_initial(self.U, self.sol.value(self.U))
+    self.opt.set_initial(self.X, self.sol.value(self.X))
 
     # create output LIP state
     self.lip_state['com']['pos'] = np.array([self.x[0], self.x[3], self.x[6]])

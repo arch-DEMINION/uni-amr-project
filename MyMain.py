@@ -56,7 +56,7 @@ def main() -> None:
 
         env.UpdatePlot()
 
-    input("finisched")
+    input("finished")
 
 
 
