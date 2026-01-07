@@ -150,7 +150,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -1     , high = 1     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -2e-3     , high =2e-3     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -190,7 +190,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # collect the state and the reward
     state_array, state_dict = self.GetState()
     reward = self.GetReward(state_dict, action_dict)
-    print("\nReward: "+ str(reward))
+    print("Reward: "+ str(reward))
 
     # update the current step counter
     self.current_step += 1
@@ -428,14 +428,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
     safe_CoM = state['com_pos'][2] >= Com_Lb and state['com_pos'][2] < Com_Up
 
     # zmp constraints
-    safe_ZmP = (state['zmp_pos'][0] <= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-               (state['zmp_pos'][0] >= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
-               (state['zmp_pos'][1] <= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
-               (state['zmp_pos'][1] >= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] - self.node.params['foot_size'] / 2.) and \
-               (state['zmp_pos'][2] <= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+    safe_ZmP_x = (state['zmp_pos'][0] <= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+                  (state['zmp_pos'][0] >= self.node.mpc.sol.value(self.node.mpc.zmp_x_mid_param)[0] - self.node.params['foot_size'] / 2.) 
+    safe_ZmP_y = (state['zmp_pos'][1] <= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
+               (state['zmp_pos'][1] >= self.node.mpc.sol.value(self.node.mpc.zmp_y_mid_param)[0] - self.node.params['foot_size'] / 2.)
+    safe_ZmP_z = (state['zmp_pos'][2] <= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] + self.node.params['foot_size'] / 2.) and \
                (state['zmp_pos'][2] >= self.node.mpc.sol.value(self.node.mpc.zmp_z_mid_param)[0] - self.node.params['foot_size'] / 2.)
-
-    return safe_CoM and safe_ZmP
+    safe_ZmP = safe_ZmP_x and safe_ZmP_y and safe_ZmP_z
+               
+    safe = safe_CoM and safe_ZmP
+    if not safe:
+      print(f"com safe: {safe_CoM}, zmp safe: {safe_ZmP_x},{safe_ZmP_y},{safe_ZmP_z}")
+    return 
   
   
   def R_sw(self, state : dict[str, any],action : dict[str, float]) -> float:
