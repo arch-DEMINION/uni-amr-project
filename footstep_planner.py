@@ -84,6 +84,8 @@ class FootstepPlanner:
     
     def get_normalized_remaining_time_in_swing(self, time):
         step_index = self.get_step_index_at_time(time)
+    
+        if self.plan[step_index]['ss_duration'] == 0: return 0
         return self.get_remaining_time_in_swing(time)/self.plan[step_index]['ss_duration']
          
     def modify_plan(self, D_pos, D_ang, time):

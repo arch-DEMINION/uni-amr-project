@@ -95,8 +95,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 1.0,
      'sigma_smooth' : 0.1,
 
-    'terminated_penalty' : -10,
-    'CoM_H_perc_safe' : 0.1
+    'terminated_penalty' : -20,
+    'CoM_H_perc_safe' : 0.1,
+
+    'action_weight_sw'  : 0.8,
+    'action_weight_ds'  : 2,
+    'action_dumping' : 0.01,
+    'r_forward' : 0.5
   }
 
 
@@ -151,7 +156,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -2e-3     , high =2e-3     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -2e-2     , high =2e-2     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -224,7 +229,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
-    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0.}]
+    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
     self.previous_rewards = []
 
     # reset the states and steps
@@ -317,7 +322,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'support_foot_pos': support_foot_pos,
       'support_foot_next_pos': support_foot_next_pos - support_foot_pos, # made relative to the support foot
       'next_footstep_pos': next_footstep_pos - support_foot_pos, # made relative to the support foot
-      'previous_action': list(self.previous_actions[-1].values())
+      'previous_action': list(self.previous_actions[-1]['list'])
     }
     state_array = np.concatenate(list(state_dict.values()))
 
@@ -339,9 +344,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # compute the current action as a dictionary
-    action_dict = {'Dx' : action[0],
-                   'Dy' : action[1],
-                   'Dth': action[2]}
+    action_dict = {'Dx'   : action[0],
+                   'Dy'   : action[1],
+                   'Dth'  : action[2],
+                   'list' : action}
 
     # add the current action dict to the list of previous actions
     self.previous_actions.append(action_dict)
@@ -376,11 +382,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
     # compute the current reward
-    current_reward = 0.0 + self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * terminated
+    current_reward = 0.0 + self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated else \
+                           self.REWARD_FUNC_CONSTANTS['r_alive']
     
     # if not enough state for compute the reward return 0
     if len(self.previous_states) < 2:
       if self.verbose: print("Not enough states to compute the reward, returning 0")
+      self.previous_rewards.append(current_reward)
       return current_reward
 
     # if not in safe set reward = 0 and return
@@ -390,13 +398,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
       return current_reward
 
     if state["support_foot"][0] == self.previous_states[-2]["support_foot"][0]: 
-      current_reward += self.R_sw(state, action)  
+      current_reward += self.R_sw(state, action) # swing phase  
     else:
       current_reward += self.R_end(state, action)
 
+    current_reward += state['com_vel'][0]*self.REWARD_FUNC_CONSTANTS['r_forward']
+
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
-
     return current_reward
 
   def UpdatePlot(self) -> None:
@@ -479,9 +488,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
-    
 
-    return self.REWARD_FUNC_CONSTANTS['r_alive'] + r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list']) / \
+                     (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
+                      self.REWARD_FUNC_CONSTANTS['action_dumping'])
+
+    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty
   
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
@@ -497,13 +509,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
       if self.verbose: print("Not enough actions to compute the reward, returning 0")
       return 0.0
     
-    current_action = np.array([action['Dx'], action['Dy'], action['Dth']])
     previous_action = np.array(state["previous_action"])
     
-    e_smooth = current_action - previous_action
+    e_smooth = action['list'] - previous_action
 
     r_smooth1 = Ker(e_smooth[0], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
     r_smooth2 = Ker(e_smooth[1], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
     r_smooth3 = Ker(e_smooth[2], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
 
-    return r_smooth1 + r_smooth2 + r_smooth3
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
+
+    return r_smooth1 + r_smooth2 + r_smooth3 + action_penalty
