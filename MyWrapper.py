@@ -94,8 +94,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
          'w_smooth' : 1.0,
      'sigma_smooth' : 0.1,
+     
+          'w_footstep' : 2.0,
+      'sigma_footstep' : 0.1,
 
-    'terminated_penalty' : -20,
+    'terminated_penalty' : -1000.0,
     'CoM_H_perc_safe' : 0.1,
 
     'action_weight_sw'  : 0.8,
@@ -156,7 +159,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -2e-2     , high =2e-2     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.5e-2     , high = 0.5e-2     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -488,12 +491,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
+    
+    r_next_footstep_x = -Ker(state['next_footstep_pos'][0], self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    r_next_footstep_y = -Ker(state['next_footstep_pos'][1], self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
 
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list']) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_dumping'])
 
-    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty
+    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + r_next_footstep_x + r_next_footstep_y
   
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
