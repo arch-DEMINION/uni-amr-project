@@ -38,8 +38,9 @@ def main() -> None:
     model = PPO("MlpPolicy", env, verbose=1, device="cpu")
 
     print("start training")
-    model.learn(total_timesteps=10_000)
-    model.save("ppo_hrp4")
+    for i in range(100):
+        model.learn(total_timesteps=1_000)
+        model.save("ppo_hrp4")
     print("end training")
     #env.UpdatePlot()
 

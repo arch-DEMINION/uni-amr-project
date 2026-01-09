@@ -27,7 +27,7 @@ class Ismpc:
 
     # optimization problem
     self.opt = cs.Opti('conic')
-    p_opts = {"expand": True}
+    p_opts = {"expand": True, "error_on_fail": False}
     s_opts = {"max_iter": 1000, "verbose": False}
     self.opt.solver("osqp", p_opts, s_opts)
 
