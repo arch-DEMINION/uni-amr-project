@@ -79,32 +79,32 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_rewards : list[ float            ]
 
   REWARD_FUNC_CONSTANTS = {
-          'r_alive' : 5.0,
+          'r_alive' : 0.5,
     
-            'w_ZmP' : 0.3,
+            'w_ZmP' : 0.003,
         'sigma_ZmP' : 0.1,
-        'w_ZmP_dot' : 0.3,
+        'w_ZmP_dot' : 0.003,
     'sigma_ZmP_dot' : 0.1,
     
-          'w_gamma' : 1.0,
+          'w_gamma' : 0.01,
       'sigma_gamma' : 0.8,
     
-             'w_ZH' : 1.0,
-            'w_phi' : 1.0,
+             'w_ZH' : 0.01,
+            'w_phi' : 0.01,
 
-         'w_smooth' : 1.0,
+         'w_smooth' : 0.01,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 2.0,
-      'sigma_footstep' : 0.1,
+          'w_footstep' : 0.1,
+      'sigma_footstep' : 2,
 
-    'terminated_penalty' : -2000.0,
+    'terminated_penalty' : -100.0,
     'CoM_H_perc_safe' : 0.1,
 
-    'action_weight_sw'  : 10,
-    'action_weight_ds'  : 2,
+    'action_weight_sw'  : 0.1,
+    'action_weight_ds'  : 0.2,
     'action_damping' : 0.01,
-    'r_forward' : 0.5
+    'r_forward' : 0.3
   }
 
 
@@ -115,7 +115,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                render_rate : int  = 5, 
                show_plot   : bool = False,
                plot_rate   : int  = 100,
-               verbose     : bool = False):
+               verbose     : bool = False,
+               agent_requency : int = 5):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -150,6 +151,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.show_plot   = show_plot
     self.plot_rate   = plot_rate
     self.verbose     = verbose
+    self.agent_requency = agent_requency
     
     self.reset()
 
@@ -159,7 +161,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.5e-2     , high = 0.5e-2     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.01     , high = 0.01     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -186,11 +188,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
     terminated = False                                # troncate because of unhelty conditions
     try:
       # take a step in to the environment
-      if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 1: # start to modify after the 6 step of the robot
-        self.ApplyAction(action_dict)
+      #if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 1: # start to modify after the 6 step of the robot
+      self.ApplyAction(action_dict)
 
-      self.node.customPreStep()
-      self.world.step()
+      for _ in range(self.agent_requency):
+        self.node.customPreStep()
+        self.world.step()
+        self.current_MPC_step += 1
+        # render and plot updating
+        self.render()
+
     except Exception as e:
       print("Failure during simulation")
       print(e)
@@ -205,9 +212,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.current_step += 1
 
     truncated = self.current_step > self.max_steps   # truncate the termination because to long
-
-    # render and plot updating
-    self.render()
 
     # log and plot
     if self.show_plot:
@@ -238,6 +242,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # reset the states and steps
     state_array, state_dict = self.GetState()
     self.current_step = 0
+    self.current_MPC_step = 0
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
@@ -251,7 +256,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
     if self.verbose: print('Rendering the simulation')
 
-    if self.render_ and self.current_step % self.render_rate == 0: 
+    if self.render_ and self.current_MPC_step % self.render_rate == 0: 
       self.node.RenderFootsteps()
       self.viewer.frame()
 
@@ -386,8 +391,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # to be removed the modulation of the displacement
-    pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])#*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
-    ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
+    pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+    ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
 
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
@@ -413,18 +418,19 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.previous_rewards.append(current_reward)
       return current_reward
 
-    if state["support_foot"][0] == self.previous_states[-2]["support_foot"][0]: 
+    if state['remaining_time'] > 0: #state["support_foot"][0] == self.previous_states[-2]["support_foot"][0]: 
       # if not in safe set reward = 0 and return
       # for now our computation of the safe set onlèy makes sense during swing
-      if not self.Is_in_Safe_Set(state):
+      #if not self.Is_in_Safe_Set(state):
         # print("Not in safe set for reward")
-        self.previous_rewards.append(0.)
-        return 0.
+        #self.previous_rewards.append(0.)
+        #return 0.
         
       current_reward += self.R_sw(state, action) # swing phase  
     else:
       current_reward += self.R_end(state, action)
 
+    # reward for going forward
     current_reward += state['com_vel'][0]*self.REWARD_FUNC_CONSTANTS['r_forward']
 
     # add the current reward to the list of previous rewards

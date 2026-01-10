@@ -5,6 +5,8 @@ import gymnasium as gym
 import time
 import numpy as np
 
+from stable_baselines3.common.monitor import Monitor
+
 def SB3_test() -> None:
     env = gym.make("InvertedPendulum-v5")
 
@@ -32,15 +34,18 @@ def SB3_test() -> None:
 
 
 def main() -> None:
-    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True)
+    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=1_000)
+    env = Monitor(env, filename="monitor.csv")
     #MyWrapper.ISMPC2gym_env_wrapper
 
-    model = PPO("MlpPolicy", env, verbose=1, device="cpu")
+    model = PPO("MlpPolicy", env, verbose=2, device="cpu", n_steps=256, ent_coef=0.01)
+    #model.load("ppo_hrp4_4")
 
     print("start training")
     for i in range(100):
-        model.learn(total_timesteps=1_000)
-        model.save("ppo_hrp4")
+        model.learn(total_timesteps=256, progress_bar=True)
+        model.save("ppo_hrp4_4")
+        print(f'saved {i}')
     print("end training")
     #env.UpdatePlot()
 

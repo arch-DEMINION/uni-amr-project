@@ -29,7 +29,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             'world_time_step': world.getTimeStep(),
             'first_swing': 'rfoot',
             'µ': 0.5,
-            'N': 100,
+            'N': 100, # TO MODIFY N = 100
             'dof': self.hrp4.getNumDofs(),
         }
         self.params['eta'] = np.sqrt(self.params['g'] / self.params['h'])
@@ -81,8 +81,8 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.id = id.InverseDynamics(self.hrp4, redundant_dofs)
 
         # initialize footstep planner
-        reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
-        # reference = [(0.0, 0., 0.0)] * 5  + [(0., 0., 0.)] * 100 
+        #reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
+        reference = [(0.0, 0., 0.0)] * 5  + [(0., 0., 0.)] * 100 
         #print(reference)
         #reference = [(0.1, 0., 0.)] * 5 + [(0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
 
