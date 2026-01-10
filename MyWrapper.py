@@ -103,8 +103,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     'action_weight_sw'  : 0.1,
     'action_weight_ds'  : 0.2,
-    'action_damping' : 0.01,
-    'r_forward' : 0.3
+    'action_damping' : 0.1,
+    'r_forward' : 3.0
   }
 
 
@@ -161,7 +161,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.01     , high = 0.01     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.05     , high = 0.05     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -514,14 +514,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
     
-    r_next_footstep_x = -Ker(state['next_footstep_relpos'][0], self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
-    r_next_footstep_y = -Ker(state['next_footstep_relpos'][1], self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
-
+    r_next_footstep = -Ker(np.norm(state['next_footstep_relpos'][0], state['next_footstep_relpos'][1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+   
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list']) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
 
-    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + r_next_footstep_x + r_next_footstep_y
+    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + r_next_footstep 
   
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
