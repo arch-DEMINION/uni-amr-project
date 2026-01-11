@@ -4,6 +4,7 @@ from stable_baselines3 import PPO
 import gymnasium as gym
 import time
 import numpy as np
+import torch 
 
 from stable_baselines3.common.monitor import Monitor
 
@@ -37,14 +38,16 @@ def main() -> None:
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=1_000)
     env = Monitor(env, filename="monitor.csv")
     #MyWrapper.ISMPC2gym_env_wrapper
+    
+    policy_kwargs = dict( activation_fn =torch.nn.Tanh, net_arch = dict( pi = [256, 256, 128] , vf = [256 , 256, 64]))
 
-    model = PPO("MlpPolicy", env, verbose=2, device="cpu", n_steps=256, ent_coef=0.01)
+    model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=2, device="cpu", n_steps=1024, ent_coef=0.01 )
     #model.load("ppo_hrp4_4")
 
     print("start training")
     for i in range(100):
-        model.learn(total_timesteps=256, progress_bar=True)
-        model.save("ppo_hrp4_4")
+        model.learn(total_timesteps=1024, progress_bar=True)
+        model.save("ppo_hrp4_5")
         print(f'saved {i}')
     print("end training")
     #env.UpdatePlot()
