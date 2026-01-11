@@ -38,12 +38,12 @@ def main() -> None:
     env = Monitor(env, filename="monitor.csv")
     #MyWrapper.ISMPC2gym_env_wrapper
 
-    model = PPO("MlpPolicy", env, verbose=2, device="cpu", n_steps=256, ent_coef=0.01)
+    model = PPO("MlpPolicy", env, verbose=2, device="cpu", n_steps=512, ent_coef=0.01)
     #model.load("ppo_hrp4_4")
 
     print("start training")
     for i in range(100):
-        model.learn(total_timesteps=256, progress_bar=True)
+        model.learn(total_timesteps=512, progress_bar=True)
         model.save("ppo_hrp4_4")
         print(f'saved {i}')
     print("end training")
