@@ -41,7 +41,16 @@ def main() -> None:
     
     policy_kwargs = dict( activation_fn =torch.nn.Tanh, net_arch = dict( pi = [256, 256, 128] , vf = [256 , 256, 64]))
 
-    model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=2, device="cpu", n_steps=1024, ent_coef=0.01 )
+    model = PPO("MlpPolicy", env, policy_kwargs=policy_kwargs, verbose=2, device="cpu", n_steps=1024, ent_coef=0.05)  # ent_coef = 0.05 nominally
+    
+    # trick for setting to zero last layer
+    
+    last_layer = model.policy.action_net
+    last_layer.bias = None
+    torch.nn.init.constant_(last_layer.weight, 0.0)
+        
+    model.policy.action_net = last_layer    
+    
     #model.load("ppo_hrp4_4")
 
     print("start training")

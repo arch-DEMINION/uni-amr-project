@@ -81,22 +81,22 @@ class ISMPC2gym_env_wrapper(gym.Env):
   REWARD_FUNC_CONSTANTS = {
           'r_alive' : 0.5,
     
-            'w_ZmP' : 0.003,
+            'w_ZmP' : 0.3,
         'sigma_ZmP' : 0.1,
         'w_ZmP_dot' : 0.003,
     'sigma_ZmP_dot' : 0.1,
     
-          'w_gamma' : 0.01,
+          'w_gamma' : 0.1,
       'sigma_gamma' : 0.8,
     
-             'w_ZH' : 0.01,
-            'w_phi' : 0.01,
+             'w_ZH' : 0.1,
+            'w_phi' : 0.1,
 
-         'w_smooth' : 0.01,
+         'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 0.1,
-      'sigma_footstep' : 2,
+          'w_footstep' : 1,
+      'sigma_footstep' : 0.12,
 
     'terminated_penalty' : -100.0,
     'CoM_H_perc_safe' : 0.1,
@@ -104,7 +104,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'action_weight_sw'  : 0.1,
     'action_weight_ds'  : 0.2,
     'action_damping' : 0.1,
-    'r_forward' : 3.0
+    'r_forward' : 100.0
   }
 
 
@@ -116,7 +116,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                show_plot   : bool = False,
                plot_rate   : int  = 100,
                verbose     : bool = False,
-               agent_requency : int = 5):
+               agent_requency : int = 10):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -153,15 +153,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.verbose     = verbose
     self.agent_requency = agent_requency
     
-    self.reset()
+    state , _ = self.reset()
 
     # size of the observation and action spaces
-    self.obs_size = len(self.GetState()[0]) # automatically take the length of the state
+    self.obs_size = len(state) # automatically take the length of the state
     self.action_size = 3 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.05     , high = 0.05     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -1     , high = 1     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
     
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -236,7 +236,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
-    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
+    self.previous_actions = [ {'Rho' : 0., 'Phi' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
     self.previous_rewards = []
 
     # reset the states and steps
@@ -308,8 +308,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # position of next footstep (taken by foot opposing the current support foot) relative to the current foot position
     support_foot_gpos = self.node.retrieve_state()[support_foot_str]['pos']
-    next_footstep_pos = plan[step_index + 1]['pos']
-    next_footstep_ang = plan[step_index + 1]['ang']
+    next_footstep_pos = plan[step_index + 1]['pos'][0:1]
+    next_footstep_ang = plan[step_index + 1]['ang'][2]
     # position of next footstep that will be taken by the current support foot relative to the current foot position
     # (second footstep from now)
     support_foot_next_pos = plan[step_index + 2]['pos']
@@ -321,14 +321,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     perr_pivot = pivot.getTransform().matrix()@np.concatenate((perr, np.ones(1)))
     oerr_pivot = pivot.getTransform().rotation()@oerr
     next_footstep_relpos = np.concatenate((perr_pivot, oerr_pivot))
-    next_footstep_relpos = np.array([next_footstep_relpos[i] for i in [3,4,2]])
+    next_footstep_relpos = np.array([next_footstep_relpos[i] for i in [0,1,5]])  # x, y, gamma 
 
     perr = support_foot_next_pos - support_foot_gpos[3:]
     oerr = support_foot_next_ang - support_foot_gpos[:3]
     perr_pivot = pivot.getTransform().matrix()@np.concatenate((perr, np.ones(1)))
     oerr_pivot = pivot.getTransform().rotation()@oerr
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
-    support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [3,4,2]])
+    support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
 
     # compute the state as a np.array and as a dictionary
     state_dict = {
@@ -340,10 +340,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'zmp_vel':  ismpc_state['zmp']['vel'],
       'torso_orient': ismpc_state['torso']['pos'],
       'torso_angvel': ismpc_state['torso']['vel'],
-      'base_orient': ismpc_state['base']['pos'],
-      'base_angvel': ismpc_state['base']['vel'],
+     # 'base_orient': ismpc_state['base']['pos'],
+     # 'base_angvel': ismpc_state['base']['vel'],
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
-      'zmp_vel_desired': self.node.desired['zmp']['vel'],
+     # 'zmp_vel_desired': self.node.desired['zmp']['vel'],
       'angular_momentum': L,
       'angular_momentum_drv': Ldot,
       'support_foot_pos': support_foot_pos,
@@ -371,11 +371,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # compute the current action as a dictionary
-    action_dict = {'Dx'   : action[0],
-                   'Dy'   : action[1],
-                   'Dth'  : action[2],
-                   'list' : action}
-
+    
+    # polar coordinate transformation 
+    
+    rho = num_to_range(action[0], self.action_space.low[0], self.action_space.high[0] ,0, 0.05)
+    phi = num_to_range(action[1],self.action_space.low[1], self.action_space.high[1] , -np.pi, np.pi)
+    dth = num_to_range(action[2], self.action_space.low[2], self.action_space.high[2], -np.pi/100, np.pi/100)
+    
+    action_dict = {'Rho'   : rho,
+                   'Phi'   : phi,
+                   'Dth'  : dth,
+                   'list' : np.array([rho , phi ,dth])}
+    
     # add the current action dict to the list of previous actions
     self.previous_actions.append(action_dict)
 
@@ -391,9 +398,19 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # to be removed the modulation of the displacement
-    pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
-    ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+    dx_coord_pol = action_dict['Rho']* np.cos(action_dict["Phi"])
+    dy_coord_pol = action_dict['Rho']* np.sin(action_dict["Phi"])
+    
+    pos_displacement = np.array([dx_coord_pol, dy_coord_pol, 0.0])
+    ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
+    scale = self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) 
+    if scale > 0:
+      
+      pos_displacement *= scale
+      ang_displacement *= scale
+    
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
+    
 
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
     '''
@@ -514,9 +531,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
     
-    r_next_footstep = -Ker(np.norm(state['next_footstep_relpos'][0], state['next_footstep_relpos'][1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
    
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list']) / \
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'][::2], action['list'][::2]) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
 
@@ -536,13 +553,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
       if self.verbose: print("Not enough actions to compute the reward, returning 0")
       return 0.0
     
-    previous_action = np.array(state["previous_action"])
+    previous_action = self.previous_actions[-2]["list"]
     
     #e_smooth = action['list'] - previous_action
     #r_smooth1 = Ker(e_smooth[0], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
     #r_smooth2 = Ker(e_smooth[1], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
     #r_smooth3 = Ker(e_smooth[2], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
 
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
+    action_penalty_rho = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.pow(action['Rho'], 2)
+    action_penalty_dth = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.pow(action['Dth'], 2)
 
-    return action_penalty
+    return action_penalty_rho + action_penalty_dth

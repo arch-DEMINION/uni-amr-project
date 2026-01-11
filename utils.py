@@ -132,3 +132,6 @@ def Ker(e : float, sigma_v : float, weight : float) -> float:
     '''
 
     return weight*np.exp( -np.pow(e/sigma_v + 1e-8, 2) )
+
+def num_to_range(num, inMin, inMax, outMin, outMax):
+  return outMin + (float(num - inMin) / float(inMax - inMin) * (outMax-outMin))
