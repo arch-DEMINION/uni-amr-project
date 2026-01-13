@@ -110,7 +110,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
   def __init__(self, 
                name        : str  = 'hrp4', 
-               max_step    : int  = 10_000,
+               max_step    : int  = 1_000,
                render      : bool = True,
                render_rate : int  = 5, 
                show_plot   : bool = False,
@@ -161,7 +161,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.5e-2     , high = 0.5e-2     , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.01    , high = 0.01    , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -398,7 +398,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
     
-
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
     '''
     Method for computing the reward based on the state as dictionary, all the environment and the actions
@@ -422,13 +421,25 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.previous_rewards.append(current_reward)
       return current_reward
 
+    # TODO: safe set?
+
     if state['remaining_time'] > 0:
-      # TODO: safe set?
       # swing phase
       current_reward += self.R_sw(state, action)
     else:
       # double support phase
       current_reward += self.R_end(state, action)
+
+    # penalty for placing the foots to close
+    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    current_reward += r_next_footstep
+
+    ismpc_state = self.node.retrieve_state()
+
+    # forward bonus
+    current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
+    # penalty for y velocity
+    current_reward += -np.pow(ismpc_state['com']['vel'][1], 2) * self.REWARD_FUNC_CONSTANTS['r_forward']
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
@@ -446,8 +457,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   def InitPlot(self) -> None:
     self.node.logger.initialize_plot(frequency=10)
     self.is_plot_init = True
-    
-    
+      
   def Is_in_Safe_Set(self, state : dict[str, any]) -> bool:
     
     '''
@@ -481,7 +491,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     return safe
   
-  
   def R_sw(self, state : dict[str, any],action : dict[str, float]) -> float:
     '''
     Reward function for the swing phase
@@ -511,14 +520,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
     
-    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
-   
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'][::2], action['list'][::2]) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
 
-    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + r_next_footstep 
-  
+    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty 
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
     '''
@@ -529,11 +535,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The reward for the end of the step
     :rtype: float
     '''
-    
-    #e_smooth = action['list'] - previous_action
-    #r_smooth1 = Ker(e_smooth[0], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
-    #r_smooth2 = Ker(e_smooth[1], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
-    #r_smooth3 = Ker(e_smooth[2], self.REWARD_FUNC_CONSTANTS['sigma_smooth'], self.REWARD_FUNC_CONSTANTS['w_smooth'])
 
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
 

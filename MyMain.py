@@ -2,11 +2,6 @@ import MyWrapper
 
 from stable_baselines3 import PPO
 import gymnasium as gym
-import time
-import numpy as np
-import torch 
-
-from stable_baselines3.common.monitor import Monitor
 
 def SB3_test() -> None:
     env = gym.make("InvertedPendulum-v5")
@@ -36,7 +31,14 @@ def SB3_test() -> None:
 
 def main() -> None:
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=1_000)
-    model = PPO.load("ppo_hrp4_multienv3", env=env, device="cpu", force_reset=True)
+    model = PPO.load("ppo_hrp4_multienv_forward", env=env, device="cpu", force_reset=True)
+    #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
+    '''
+    for _ in range(10):
+        model.learn(total_timesteps=1024)
+        model.save('ppo_hrp4')
+        print('saved')
+    '''
 
     print("start simulations")
     for i in range(1):
