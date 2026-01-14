@@ -5,6 +5,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from MyPolicy import NoBiasActionBiasACPolicy
 from stable_baselines3.common.vec_env import  VecFrameStack
 import gymnasium as gym
+import numpy as np
 
 
 def SB3_test() -> None:
@@ -35,22 +36,22 @@ def SB3_test() -> None:
 
 def main() -> None:
     
-    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=1_000)
+    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, n_stack=4)
     env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.0)
     
     model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
     
-    #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
-    # model.load("ppo_hrp4_multienv_forward")
-    #env = VecNormalize.load("env_normalized.pkl", env)
+    model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
+    model.load("ppo_hrp4")
+    env = VecNormalize.load("env_normalized.pkl", env)
     
     for _ in range(10):
         model.learn(total_timesteps=1024)
         model.save('ppo_hrp4')
         env.save("env_normalized.pkl")
-        print('saved')
+        print('saved' + '@'*20)
     
     print("start simulations")
     env.training = False
@@ -60,7 +61,7 @@ def main() -> None:
 
         for _ in range(1500):
             action, _states = model.predict(s, deterministic=True)
-            #action = np.array([0.001, 0, 0.0]) # send action just to make the robot going forward
+            #action = np.array([0.0, 0.01, 0.0]) # send action just to make the robot going forward
             s, r, term, trunc, info = env.step(action)
 
             if term or trunc: break

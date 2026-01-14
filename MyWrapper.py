@@ -211,7 +211,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # update the current step counter
     self.current_step += 1
 
-    truncated = self.current_step > self.max_steps   # truncate the termination because to long
+    truncated = self.current_step > self.max_steps or \
+                self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)  # truncate the termination because to long
 
     # log and plot
     if self.show_plot:
