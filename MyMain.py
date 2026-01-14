@@ -1,7 +1,9 @@
 import MyWrapper
 
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import gymnasium as gym
+
 
 def SB3_test() -> None:
     env = gym.make("InvertedPendulum-v5")
@@ -32,14 +34,20 @@ def SB3_test() -> None:
 def main() -> None:
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=1_000)
     model = PPO.load("ppo_hrp4_multienv_forward", env=env, device="cpu", force_reset=True)
+    
+    env = DummyVecEnv([lambda: env])
+   # env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.0)
+    
     #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
-    '''
+    env = VecNormalize.load("env_normalized.pkl", env)
+    
+    
     for _ in range(10):
         model.learn(total_timesteps=1024)
         model.save('ppo_hrp4')
+        env.save("env_normalized.pkl")
         print('saved')
-    '''
-
+    
     print("start simulations")
     for i in range(1):
         print(f"simulation #{i}")

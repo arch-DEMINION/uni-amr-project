@@ -5,6 +5,7 @@ import gymnasium as gym
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env import VecNormalize
 import time
 import numpy as np
 import torch
@@ -12,8 +13,17 @@ from MyPolicy import NoBiasActionBiasACPolicy
 
 def main() -> None:
     vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs=8, env_kwargs={"verbose": False, "render": False}, vec_env_cls=SubprocVecEnv)
+    
+    vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=False, clip_obs=100.0)
 
+<<<<<<< HEAD
     model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
+=======
+    model = PPO("MlpPolicy", vec_env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2) 
+     
+   # model.load("ppo_hrp4_multienv_forward")
+   # vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)
+>>>>>>> 2d679a7 (Env: now it is possible to save and load normalization statistics for Env and VecEnv)
     
     print("start training")
     new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
@@ -21,8 +31,10 @@ def main() -> None:
     for i in range(1000):
         model.learn(total_timesteps=2048)
         model.save(f"ppo_hrp4_multienv{i%5}")
+        vec_env.save("vec_normalized.pkl")
         print(f"last save: ppo_hrp4_multienv{i%5}" + "@"*20)
     print("end training")
+    
 
     # model = PPO.load("ppo_hrp4_multienv4_", env=env, device="cpu")
     # print("start simulations")
