@@ -3,6 +3,7 @@ import MyWrapper
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from MyPolicy import NoBiasActionBiasACPolicy
+from stable_baselines3.common.vec_env import  VecFrameStack
 import gymnasium as gym
 
 
@@ -36,6 +37,8 @@ def main() -> None:
     
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=1_000)
     env = DummyVecEnv([lambda: env])
+    
+    env = VecFrameStack(env, n_stack=4)
     env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.0)
     
     model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
