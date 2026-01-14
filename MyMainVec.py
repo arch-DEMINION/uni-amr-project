@@ -8,12 +8,12 @@ from stable_baselines3.common.logger import configure
 import time
 import numpy as np
 import torch
+from MyPolicy import NoBiasActionBiasACPolicy
 
 def main() -> None:
     vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs=8, env_kwargs={"verbose": False, "render": False}, vec_env_cls=SubprocVecEnv)
 
-    model = PPO("MlpPolicy", vec_env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)  
-    model.load("ppo_hrp4_multienv_forward")
+    model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
     
     print("start training")
     new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
