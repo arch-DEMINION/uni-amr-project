@@ -34,6 +34,7 @@ def main() -> None:
     
 
     # model = PPO.load("ppo_hrp4_multienv4_", env=env, device="cpu")
+    # env.training = False
     # print("start simulations")
     # for i in range(1):
     #     print(f"simulation #{i}")

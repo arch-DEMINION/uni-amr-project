@@ -37,7 +37,6 @@ def main() -> None:
     
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=1_000)
     env = DummyVecEnv([lambda: env])
-    
     env = VecFrameStack(env, n_stack=4)
     env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.0)
     
@@ -54,6 +53,7 @@ def main() -> None:
         print('saved')
     
     print("start simulations")
+    env.training = False
     for i in range(1):
         print(f"simulation #{i}")
         s, info = env.reset()
