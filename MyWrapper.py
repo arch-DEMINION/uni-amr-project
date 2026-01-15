@@ -211,7 +211,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # update the current step counter
     self.current_step += 1
 
-    truncated = self.current_step > self.max_steps   # truncate the termination because to long
+    # truncate the episode because it was too long or we reached the end of the plan
+    truncated = self.current_step > self.max_steps or \
+                self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
 
     # log and plot
     if self.show_plot:
@@ -243,6 +245,21 @@ class ISMPC2gym_env_wrapper(gym.Env):
     state_array, state_dict = self.GetState()
     self.current_step = 0
     self.current_MPC_step = 0
+
+    # advance in the world until the first foot starts moving
+    # this is to avoid having the agent work before MPC starts working and the robot cannot move    
+    def robot_moving() -> bool:
+      foot = self.node.footstep_planner.plan[0]['foot_id']
+      state = self.node.retrieve_state()
+      initial = self.node.initial[foot]['pos']
+      foot_pos = state[foot]['pos']
+      return foot_pos[5] >= initial[5] + 1e-2
+    
+    while not robot_moving():
+      self.node.customPreStep()
+      self.world.step()
+      self.render()
+
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
@@ -430,8 +447,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       # double support phase
       current_reward += self.R_end(state, action)
 
-    # penalty for placing the foots to close
-    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    # penalty for placing the feet too close
+    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1] - self.node.params['foot_size'], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep
 
     ismpc_state = self.node.retrieve_state()

@@ -18,6 +18,9 @@ def main() -> None:
     vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=False, clip_obs=100.0)
 
     model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
+    i=2
+    model.load(f"ppo_hrp4_multienv{i}")
+    vec_env = VecNormalize.load(f"vec_normalized{i}.pkl", vec_env)
 
    # model.load("ppo_hrp4_multienv_forward")
    # vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)
@@ -28,7 +31,7 @@ def main() -> None:
     for i in range(1000):
         model.learn(total_timesteps=2048)
         model.save(f"ppo_hrp4_multienv{i%5}")
-        vec_env.save("vec_normalized.pkl")
+        vec_env.save(f"vec_normalized{i%5}.pkl")
         print(f"last save: ppo_hrp4_multienv{i%5}" + "@"*20)
     print("end training")
     
