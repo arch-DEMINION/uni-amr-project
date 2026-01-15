@@ -88,7 +88,7 @@ class FootstepPlanner:
         if self.plan[step_index]['ss_duration'] == 0: return 0
         return self.get_remaining_time_in_swing(time)/self.plan[step_index]['ss_duration']
          
-    def modify_plan(self, D_pos, D_ang, time):
+    def modify_plan(self, D_pos, D_ang, time, scaler = 0.99):
         
         # start one index later to avoid shifting the plan on the foot currently on the ground
         starting_index = self.get_step_index_at_time(time) + 1
@@ -98,5 +98,7 @@ class FootstepPlanner:
            starting_index += 1
 
         for i in range(starting_index, len(self.plan)):
-            self.plan[i]['pos'] += D_pos 
+            self.plan[i]['pos'] += D_pos
             self.plan[i]['ang'] += D_ang
+            D_pos *= scaler
+            D_ang *= scaler
