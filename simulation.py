@@ -11,6 +11,7 @@ import foot_trajectory_generator as ftg
 from logger import Logger
 import timeit
 from math import sin,cos
+import random
 
 
 class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
@@ -80,11 +81,33 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         # initialize inverse dynamics
         self.id = id.InverseDynamics(self.hrp4, redundant_dofs)
 
-        # initialize footstep planner
-        #reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
-        reference = [(0.0, 0., 0.0)] * 5  + [(0., 0., 0.)] * 100 
-        #print(reference)
-        #reference = [(0.1, 0., 0.)] * 5 + [(0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
+        # initialize footstep planner with a random plan
+        match random.randint(0, 7):
+            case 0:
+                # weird sine like
+                reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
+            case 1:
+                # on the spot
+                reference = [(0., 0., 0.)] * 100
+            case 2:
+                # forwards, then backwards
+                reference = [(0.1, 0., 0.)] * 25 + [(-0.1, 0., 0.)] * 25
+            case 3:
+                # backwards, then forwards
+                reference = [(-0.1, 0., 0.)] * 25 + [(0.1, 0., 0.)] * 25
+            case 4:
+                # turn on the spot
+                reference = [(0.0, 0., 0.2)] * 25
+            case 5:
+                # turn on the spot (other direction)
+                reference = [(0.0, 0., 0.2)] * 25
+            case 6:
+                # to the left
+                reference = [(0.0, -0.1, 0.)] * 25
+            case 7:
+                # to the right
+                reference = [(0.0, 0.1, 0.)] * 25
+
 
         self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
