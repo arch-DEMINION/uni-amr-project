@@ -103,8 +103,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     'action_weight_sw'  : 0.1,
     'action_weight_ds'  : 0.2,
-    'action_damping' : 0.1,
-    'r_forward' : 100.0
+    'action_damping' : 0.05
   }
 
 
@@ -116,7 +115,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                show_plot   : bool = False,
                plot_rate   : int  = 100,
                verbose     : bool = False,
-               mpc_frequency : int = 15):
+               mpc_frequency : int = 10):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -429,7 +428,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
     # compute the current reward
-    current_reward = 0.0 + self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated else \
+    # TODO: different penalties depending on termination reason (maximum iterations, solved inaccurate)
+    terminated_status = self.node.mpc.sol.stats()["return_status"]
+    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated_status == 'maximum iterations reached' else self.REWARD_FUNC_CONSTANTS['terminated_penalty']*0.5
+    current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
     
     # if not enough state for compute the reward return 0
@@ -452,11 +454,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     current_reward += r_next_footstep
 
     ismpc_state = self.node.retrieve_state()
-
-    # forward bonus
-    current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
-    # penalty for y velocity
-    current_reward += -np.pow(ismpc_state['com']['vel'][1], 2) * self.REWARD_FUNC_CONSTANTS['r_forward']
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
@@ -537,7 +534,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
     
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'][::2], action['list'][::2]) / \
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_sw']*np.dot(action['list'][::2], action['list'][::2]) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
 
@@ -553,6 +550,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
 
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.norm(action['list'], ord=2)
 
     return action_penalty
