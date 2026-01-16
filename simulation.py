@@ -11,6 +11,7 @@ import foot_trajectory_generator as ftg
 from logger import Logger
 import timeit
 from math import sin,cos
+import utils as utils
 
 
 class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
@@ -81,10 +82,10 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.id = id.InverseDynamics(self.hrp4, redundant_dofs)
 
         # initialize footstep planner
-        #reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
-        #reference = [(0.0, 0., 0.0)] * 5  + [(0., 0., 0.)] * 100 
+      #  reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
+        reference = [(0.0, 0., 0.0)] * 5  + [(0., 0., 0.)] * 100 
         #print(reference)
-        reference = [(0.1, 0., 0.)] * 5 + [(0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
+     #   reference = [(0.0, 0.1, 0.)] * 5 + [(0.1, 0.0, 0.)] * 5 + [(0.0, 0.1, 0.)] * 10
 
         self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
@@ -324,7 +325,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             self.world.addSkeleton(step_skel)
             self.plan_skeleton.append(step_skel)
 
-def simulation_setup(render = True):
+def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0):
     world = dart.simulation.World()
 
     urdfParser = dart.utils.DartLoader()
@@ -333,7 +334,13 @@ def simulation_setup(render = True):
     ground = urdfParser.parseSkeleton(os.path.join(current_dir, "urdf", "ground.urdf"))
     world.addSkeleton(hrp4)
     world.addSkeleton(ground)
-    world.setGravity([0, 0, -9.81])
+    
+    # modified gravity
+    #world.setGravity([0, 1, -9.81])
+    g = 9.81
+    gravity = [-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)]
+    world.setGravity(gravity)
+    
     world.setTimeStep(0.01)
 
     # set default inertia

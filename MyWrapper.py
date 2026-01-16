@@ -79,7 +79,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_rewards : list[ float            ]
 
   REWARD_FUNC_CONSTANTS = {
-          'r_alive' : 0.5,
+          'r_alive' : 1.0,
     
             'w_ZmP' : 0.3,
         'sigma_ZmP' : 0.1,
@@ -104,7 +104,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'action_weight_sw'  : 0.1,
     'action_weight_ds'  : 0.2,
     'action_damping' : 0.1,
-    'r_forward' : 100.0
+    'r_forward' : 10.0
   }
 
 
@@ -116,7 +116,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                show_plot   : bool = False,
                plot_rate   : int  = 100,
                verbose     : bool = False,
-               mpc_frequency : int = 15):
+               mpc_frequency : int = 15,
+               frequency_change_grav : int = 5):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -152,6 +153,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.plot_rate   = plot_rate
     self.verbose     = verbose
     self.mpc_frequency = mpc_frequency
+    self.episodes = 0
+    self.frequency_change_of_grav = frequency_change_grav
     
     state , _ = self.reset()
 
@@ -196,6 +199,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.world.step()
         self.current_MPC_step += 1
         # render and plot updating
+        status = self.node.mpc.sol.stats()["return_status"]
         self.render()
 
     except Exception as e:
@@ -231,8 +235,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The resetted state for begin the simulation and the dictionary with interesting infos
     :rtype: tuple [state: Any | info: dict[str, Any]]
     '''
-
-    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_)
+    angle_x = 0.0
+    angle_y = 0.0
+    
+    if (self.episodes % self.frequency_change_of_grav) == 0:
+      angle_y += 0.0
+      angle_x += 0.06  # 3,4° degree around x axis
+      
+    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, angle_x, angle_y)
     self.is_plot_init = False
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
@@ -244,6 +254,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     state_array, state_dict = self.GetState()
     self.current_step = 0
     self.current_MPC_step = 0
+    self.episodes += 1
+    print("\nStarting episode: " + str(self.episodes) + "\n")
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
@@ -444,6 +456,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
+    print("Total Reward up to now: "+ str(np.sum(self.previous_rewards)))
     return current_reward
 
   def UpdatePlot(self) -> None:
