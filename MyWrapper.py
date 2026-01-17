@@ -96,7 +96,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
      'sigma_smooth' : 0.1,
      
           'w_footstep' : 1,
-      'sigma_footstep' : 0.12,
+      'sigma_footstep' : 0.2,#0.12,
 
     'terminated_penalty' : -100.0,
     'CoM_H_perc_safe' : 0.1,
@@ -108,8 +108,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.06*2])*0.3, # [3,4°, 6,8°]
-    'gravity_y_range' : np.array([0.06, 0.06*2])*0.3,
+    'gravity_x_range' : np.array([0.06, 0.06*2])*1, # [3,4°, 6,8°]
+    'gravity_y_range' : np.array([0.06, 0.06*2])*1,
     'gravity_change_prob' : 0 * 0.01 # 3%
   }
 
@@ -457,9 +457,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     ismpc_state = self.node.retrieve_state()
 
     # forward bonus
-    current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
+    #current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
     # penalty for y velocity
-    current_reward += -np.pow(ismpc_state['com']['vel'][1], 2) * self.REWARD_FUNC_CONSTANTS['r_forward']
+    #current_reward += -np.pow(ismpc_state['com']['vel'][1], 2) * self.REWARD_FUNC_CONSTANTS['r_forward']
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
