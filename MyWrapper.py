@@ -221,7 +221,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.current_step += 1
 
     truncated = self.current_step > self.max_steps or \
-                self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)  # truncate the termination because to long
+                self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 5)  # truncate the termination because to long
 
     # log and plot
     if self.show_plot:

@@ -46,13 +46,13 @@ def main() -> None:
     #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
     #model.load("ppo_hrp4")
     #env = VecNormalize.load("env_normalized.pkl", env)
-    '''
+    
     for _ in range(10):
         model.learn(total_timesteps=1024)
         model.save('ppo_hrp4')
         env.save("env_normalized.pkl")
         print('saved' + ' @'*20)
-        '''
+        
     
     print("start simulations")
     env.training = False
