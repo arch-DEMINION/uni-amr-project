@@ -13,6 +13,7 @@ import footstep_planner
 import inverse_dynamics as id
 import filter
 import foot_trajectory_generator as ftg
+import random
 from logger import Logger
 
 import simulation
@@ -110,7 +111,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
   PERTURBATION_PARAMETHERS = {
     'gravity_x_range' : np.array([0.06, 0.06*2])*1, # [3,4°, 6,8°]
     'gravity_y_range' : np.array([0.06, 0.06*2])*1,
-    'gravity_change_prob' : 0 * 0.01 # 3%
+    'gravity_change_prob' : 0 * 0.01, # 3%
+    'ext_force_appl_prob': 0.00333,  # 1%
+    'force_range': np.array([10, 150])*1,   # Newton
+    'CoM_offset_range': np.array([0.01, 0.1]) # meters from the CoM of the body
   }
 
   def __init__(self, 
@@ -121,7 +125,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                show_plot   : bool = False,
                plot_rate   : int  = 100,
                verbose     : bool = False,
-               mpc_frequency : int = 15,
+               mpc_frequency : int = 10,
                frequency_change_grav : int = 5):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
@@ -169,7 +173,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.01    , high = 0.01    , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.015    , high = 0.015   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -197,15 +201,27 @@ class ISMPC2gym_env_wrapper(gym.Env):
     try:
       # take a step in to the environment
       #if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 1: # start to modify after the 6 step of the robot
+
+          
       self.ApplyAction(action_dict)
 
-      for _ in range(self.mpc_frequency):
+      for i in range(self.mpc_frequency):
+        
         self.node.customPreStep()
         self.world.step()
         self.current_MPC_step += 1
         # render and plot updating
         status = self.node.mpc.sol.stats()["return_status"]
+        
+        if i == self.mpc_frequency-1 and np.random.random() < self.PERTURBATION_PARAMETHERS['ext_force_appl_prob']:
+          
+          random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETHERS['force_range'], self.PERTURBATION_PARAMETHERS['CoM_offset_range'])
+          random_body.addExtForce(random_force, random_point, True)
+          #if self.verbose: print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
+          print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
+          
         self.render()
+      
 
     except Exception as e:
       print("Failure during simulation")
@@ -233,6 +249,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
+
 
   def reset(self, *, seed : int | None = None, options = None,) -> tuple[np.array, dict[str, any]]:
     '''
@@ -589,3 +606,36 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * (np.random.random() * (range_x[1] - range_x[0])) + range_x[0]  # from 3,4° to 6,8°
       
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
+    
+    
+  def Get_random_force(self, range_f : list[float, float], range_p : list[float, float]) -> None:
+    '''
+    Method for applying a random force on a random point of the robot at a certain time step
+
+    :param range_f: The range of admissible modules of forces 
+    :type range_f: list[float, float]
+    :param range_p: The range of admissible distances of forces application points from the body CoM
+    :type range_f: list[float, float]
+    '''
+
+    random_force_x = np.random.choice([-1, 1]) * (np.random.random() * (range_f[1] - range_f[0])) + range_f[0] 
+    random_force_y = np.random.choice([-1, 1]) * (np.random.random() * (range_f[1] - range_f[0])) + range_f[0] 
+    random_force_z = np.random.choice([-1, 1]) * (np.random.random() * (range_f[1] - range_f[0])) + range_f[0] 
+    
+    random_force = np.array([random_force_x , random_force_y, random_force_z])
+    
+    random_point_x = np.random.choice([-1, 1]) * (np.random.random() * (range_p[1] - range_p[0])) + range_p[0] 
+    random_point_y = np.random.choice([-1, 1]) * (np.random.random() * (range_p[1] - range_p[0])) + range_p[0] 
+    random_point_z = np.random.choice([-1, 1]) * (np.random.random() * (range_p[1] - range_p[0])) + range_p[0] 
+    
+    random_point = np.array([random_point_x , random_point_y, random_point_z])
+    
+    nodes = {
+        "l_sole": self.node.lsole,
+        "r_sole": self.node.rsole,
+        "torso": self.node.torso,
+        "body":  self.node.base
+    }
+    random_body_name, random_body = random.choice(list(nodes.items()))
+      
+    return random_force, random_point, random_body, random_body_name
