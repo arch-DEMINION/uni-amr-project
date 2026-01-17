@@ -95,7 +95,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 1,
+          'w_footstep' : 2,
       'sigma_footstep' : 0.2,#0.12,
 
     'terminated_penalty' : -100.0,
@@ -413,8 +413,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :param action_dict: The dictionary containing the displacements Dx, Dy and Dtheta
     :type action_dict: dict[str, float]
     '''
+    
+    # get the current angular position of the support footstep
+    index = self.node.footstep_planner.get_step_index_at_time(self.node.time)
+    z_support_footstep = self.node.footstep_planner.plan[index]['ang'][2]
 
-    pos_displacement = np.array([action_dict['Dx'], action_dict['Dy'], 0.0])#*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+    # compute the position displacemnt along the support foot reference
+    pos_displacement = np.array([action_dict['Dx'] * cos(z_support_footstep), action_dict['Dy'] * sin(z_support_footstep), 0.0])#*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
     

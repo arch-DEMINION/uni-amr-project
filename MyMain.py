@@ -41,7 +41,7 @@ def main() -> None:
     env = VecFrameStack(env, n_stack=4)
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=100.0)
     
-    model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
+    model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     
     #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
     #model.load("ppo_hrp4")
