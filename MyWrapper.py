@@ -162,7 +162,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.frequency_change_of_grav = frequency_change_grav
     
     state , _ = self.reset()
-    self.episodes = 0
 
     # size of the observation and action spaces
     self.obs_size = len(state) # automatically take the length of the state
@@ -416,11 +415,19 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # get the current angular position of the support footstep
     index = self.node.footstep_planner.get_step_index_at_time(self.node.time)
-    z_support_footstep = self.node.footstep_planner.plan[index]['ang'][2]
+    current_footestep = self.node.footstep_planner.plan[index]
+    z_support_footstep = current_footestep['ang'][2]
 
     # compute the position displacemnt along the support foot reference
-    pos_displacement = np.array([action_dict['Dx'] * cos(z_support_footstep), action_dict['Dy'] * sin(z_support_footstep), 0.0])#*self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+    pos_displacement = np.array([action_dict['Dx'] * cos(z_support_footstep), action_dict['Dy'] * sin(z_support_footstep), 0.0])
     ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
+
+    # scale if is in ss and time is running out
+    if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss':
+      pos_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+      ang_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
+
+    
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
     
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
