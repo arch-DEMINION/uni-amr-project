@@ -107,6 +107,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'r_forward' : 10.0
   }
 
+  PERTURBATION_PARAMETHERS = {
+    'gravity_x_range' : np.array([0.06, 0.06*2])*0.3, # [3,4°, 6,8°]
+    'gravity_y_range' : np.array([0.06, 0.06*2])*0.3,
+    'gravity_change_prob' : 0 * 0.01 # 3%
+  }
 
   def __init__(self, 
                name        : str  = 'hrp4', 
@@ -157,6 +162,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.frequency_change_of_grav = frequency_change_grav
     
     state , _ = self.reset()
+    self.episodes = 0
 
     # size of the observation and action spaces
     self.obs_size = len(state) # automatically take the length of the state
@@ -222,6 +228,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     if self.show_plot:
       self.UpdatePlot()
 
+    # sometimes change the gravity a very bit (1/10 of the intended perturbation)
+    if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
+      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETHERS['gravity_y_range']*0.1, True)
+
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
 
@@ -235,14 +245,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The resetted state for begin the simulation and the dictionary with interesting infos
     :rtype: tuple [state: Any | info: dict[str, Any]]
     '''
-    angle_x = 0.0
-    angle_y = 0.0
+    self.angle_x = 0.0
+    self.angle_y = 0.0
     
     if (self.episodes % self.frequency_change_of_grav) == 0:
-      angle_y += 0.0
-      angle_x += 0.06  # 3,4° degree around x axis
-      
-    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, angle_x, angle_y)
+      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'])
     self.is_plot_init = False
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
@@ -355,13 +362,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'com_vel':  ismpc_state['com']['vel'],
       'zmp_pos':  ismpc_state['zmp']['pos'],
       'zmp_vel':  ismpc_state['zmp']['vel'],
-      'torso_orient': ismpc_state['torso']['pos'],
+      #'torso_orient': ismpc_state['torso']['pos'],
       # 'torso_angvel': ismpc_state['torso']['vel'],
      # 'base_orient': ismpc_state['base']['pos'],
      # 'base_angvel': ismpc_state['base']['vel'],
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
      # 'zmp_vel_desired': self.node.desired['zmp']['vel'],
-      # 'angular_momentum': L,
+      'angular_momentum': L,
       # 'angular_momentum_drv': Ldot,
       # 'support_foot_pos': support_foot_pos,
       'next_footstep_relpos': next_footstep_relpos,
@@ -456,7 +463,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
-    print("Total Reward up to now: "+ str(np.sum(self.previous_rewards)))
+    print(f"Total Reward up to now: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})")
     return current_reward
 
   def UpdatePlot(self) -> None:
@@ -525,11 +532,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_ZmP_dot_y = 0 #Ker(state['zmp_vel'][1] - state['zmp_vel_desired'][1], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
     r_ZmP_dot_z = 0 #Ker(state['zmp_vel'][2] - state['zmp_vel_desired'][2], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
     
-    r_gamma = Ker(state['torso_orient'][2], self.REWARD_FUNC_CONSTANTS['sigma_gamma'],self.REWARD_FUNC_CONSTANTS['w_gamma'])
+    r_gamma = 0 #Ker(state['torso_orient'][2], self.REWARD_FUNC_CONSTANTS['sigma_gamma'],self.REWARD_FUNC_CONSTANTS['w_gamma'])
     
     # com_pos and self.node.mpc.h are in the same coordinate systems
     r_ZH  = - self.REWARD_FUNC_CONSTANTS['w_ZH'] * np.abs(state['com_pos'][2] - self.node.mpc.h)
-    r_phi = - self.REWARD_FUNC_CONSTANTS['w_phi'] * np.linalg.norm(state['torso_orient'][0:1], ord=2)
+    r_phi = 0 #- self.REWARD_FUNC_CONSTANTS['w_phi'] * np.linalg.norm(state['torso_orient'][0:1], ord=2)
 
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
     r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
@@ -553,3 +560,20 @@ class ISMPC2gym_env_wrapper(gym.Env):
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
 
     return action_penalty
+  
+  def ChangeGravity(self, range_x : list[float, float], range_y : list[float, float], additive : bool = False) -> None:
+    '''
+    Method for changing the gravity in a given interval positive or negative
+
+    :param range_x: The range of x angle [x_min, x_max]
+    :type range_x: list[float, float]
+    :param range_y: The range of y angle [y_min, y_max]
+    :type range_y: list[float, float]
+    :param additive: Flag to indicate if is an additive perturbation or a new reset of angles
+    :type additive: bool
+    '''
+
+    self.angle_y = self.angle_y*additive + np.random.choice([-1, 1]) * (np.random.random() * (range_y[1] - range_y[0])) + range_y[0]  #0.0
+    self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * (np.random.random() * (range_x[1] - range_x[0])) + range_x[0]  # from 3,4° to 6,8°
+      
+    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
