@@ -97,9 +97,11 @@ class FootstepPlanner:
         if self.get_phase_at_time(time) == 'ds':
            starting_index += 1
 
+        # modify only the next footstep
         self.plan[starting_index]['pos'] += D_pos 
         self.plan[starting_index]['ang'] += D_ang        
 
-        # for i in range(starting_index, len(self.plan)):
-        #     self.plan[i]['pos'] += D_pos 
-        #     self.plan[i]['ang'] += D_ang
+        # modify the whole plan from now
+        for i in range(starting_index, len(self.plan)):
+            self.plan[i]['pos'] += D_pos 
+            self.plan[i]['ang'] += D_ang

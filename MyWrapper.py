@@ -95,15 +95,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 1,
-      'sigma_footstep' : 0.12,
+          'w_footstep' : 0.5,
+      'sigma_footstep' : 0.7,
 
     'terminated_penalty' : -100.0,
     'CoM_H_perc_safe' : 0.1,
 
-    'action_weight_sw'  : 0.1,
-    'action_weight_ds'  : 0.2,
-    'action_damping' : 0.05
+    'action_weight_sw'  : 0.05,
+    'action_weight_ds'  : 0.1,
+    'action_damping' : 0.05,
+
+    'end_of_plan' : 100,
+    'footstep_checkpoint' : 5
   }
 
 
@@ -211,8 +214,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.current_step += 1
 
     # truncate the episode because it was too long or we reached the end of the plan
-    truncated = self.current_step > self.max_steps or \
-                self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
+    truncated =  self.current_step > self.max_steps or self.end_of_plan_condition()                
 
     # log and plot
     if self.show_plot:
@@ -220,6 +222,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
+
+  def end_of_plan_condition(self):
+    return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
 
   def reset(self, *, seed : int | None = None, options = None,) -> tuple[np.array, dict[str, any]]:
     '''
@@ -244,6 +249,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     state_array, state_dict = self.GetState()
     self.current_step = 0
     self.current_MPC_step = 0
+    self.footstep_checkpoint_given = False
+    self.initial_foot_dist = np.linalg.norm(self.node.initial['lfoot']['pos'][:3] - self.node.initial['rfoot']['pos'][:3], ord=2)
 
     # advance in the world until the first foot starts moving
     # this is to avoid having the agent work before MPC starts working and the robot cannot move    
@@ -450,10 +457,22 @@ class ISMPC2gym_env_wrapper(gym.Env):
       current_reward += self.R_end(state, action)
 
     # penalty for placing the feet too close
-    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1] - self.node.params['foot_size'], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    r_next_footstep = Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2) - self.initial_foot_dist, self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep
 
-    ismpc_state = self.node.retrieve_state()
+
+    # reward for reaching end of plan
+    if self.end_of_plan_condition():
+      current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']   
+    # reward for checkpoints in the plan
+    # hardcoded every 4th footstep, except the very first
+    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
+    if step > 0:
+      if step % 3 == 0 and not self.footstep_checkpoint_given:
+        self.footstep_checkpoint_given = True
+        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint']
+      elif step % 3 > 0:
+        self.footstep_checkpoint_given = False
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
@@ -550,6 +569,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
 
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.norm(action['list'], ord=2)
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.linalg.norm(action['list'], ord=2)
 
     return action_penalty
