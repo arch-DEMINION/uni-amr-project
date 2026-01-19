@@ -4,6 +4,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from MyPolicy import NoBiasActionBiasACPolicy
 from stable_baselines3.common.vec_env import  VecFrameStack
+from stable_baselines3.common.logger import configure
 import gymnasium as gym
 import numpy as np
 
@@ -36,7 +37,7 @@ def SB3_test() -> None:
 
 def main() -> None:
     
-    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=400, frequency_change_grav=10)
+    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, n_stack=1)
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=100.0)
@@ -46,9 +47,11 @@ def main() -> None:
     #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
     #model.load("ppo_hrp4")
     #env = VecNormalize.load("env_normalized.pkl", env)
-    
+    print("start training")
+    new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
+    model.set_logger(new_logger)
     for _ in range(10):
-        model.learn(total_timesteps=1024)
+        model.learn(total_timesteps=1024)  
         model.save('ppo_hrp4')
         env.save("env_normalized.pkl")
         print('saved' + ' @'*20)

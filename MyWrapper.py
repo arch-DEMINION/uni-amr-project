@@ -111,8 +111,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.06*2])*1, # [3,4°, 6,8°]
-    'gravity_y_range' : np.array([0.06, 0.06*2])*1,
+    'gravity_x_range' : np.array([0.06, 0.06*2])*0, # [3,4°, 6,8°]
+    'gravity_y_range' : np.array([0.06, 0.06*2])*0,
     'gravity_change_prob' : 0 * 0.01, # 3%
     'ext_force_appl_prob': 0.00333,  # 1%
     'force_range': np.array([10, 150])*1,   # Newton
@@ -128,7 +128,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                plot_rate   : int  = 100,
                verbose     : bool = False,
                mpc_frequency : int = 10,
-               frequency_change_grav : int = 5):
+               frequency_change_grav : int = 1):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -193,7 +193,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: tuple [state: np.array | reward: float | termination: bool | truncation: bool | info: dict[str, Any]]
     '''
 
-    self.render_ = True
     if self.verbose: print(f"taking a step using action: {action}")
 
     # convert and use the action
@@ -214,21 +213,21 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.world.step()
         self.current_MPC_step += 1
         # render and plot updating
-        status = self.node.mpc.sol.stats()["return_status"]
         
         if i == self.mpc_frequency-1 and np.random.random() < self.PERTURBATION_PARAMETHERS['ext_force_appl_prob']:
           
           random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETHERS['force_range'], self.PERTURBATION_PARAMETHERS['CoM_offset_range'])
           random_body.addExtForce(random_force, random_point, True)
           #if self.verbose: print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
-          print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
+          print("\nApplied force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
           
         self.render()
       
 
     except Exception as e:
-      print("Failure during simulation")
-      print(e)
+      status = self.node.mpc.sol.stats()["return_status"]
+      print("Failure during simulation: "+ str(status))
+     # print(e)
       terminated = True
 
     # collect the state and the reward
@@ -239,8 +238,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # update the current step counter
     self.current_step += 1
 
-    truncated = self.current_step > self.max_steps or \
-                self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 5)  # truncate the termination because to long
+    truncated = self.current_step > self.max_steps or self.end_of_plan_condition()    # truncate the termination because to long
 
     if terminated or truncated:
         print(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})")
@@ -249,8 +247,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.UpdatePlot()
 
     # sometimes change the gravity a very bit (1/10 of the intended perturbation)
-    if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
-      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETHERS['gravity_y_range']*0.1, True)
+   # if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
+  #    self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETHERS['gravity_y_range']*0.1, True)
 
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
@@ -290,7 +288,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # advance in the world until the first foot starts moving
     # this is to avoid having the agent work before MPC starts working and the robot cannot move
-    '''    
+        
     def robot_moving() -> bool:
       foot = self.node.footstep_planner.plan[0]['foot_id']
       state = self.node.retrieve_state()
@@ -302,7 +300,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.node.customPreStep()
       self.world.step()
       self.render()
-    '''  
+      
     print("\nStarting episode: " + str(self.episodes) + "\n")
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
