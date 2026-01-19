@@ -482,8 +482,22 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # penalty for placing the foots to close
     r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep
+    
+    if self.end_of_plan_condition():
+      current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
+      print("end of plan reached")
+    # reward for checkpoints in the plan
+    # hardcoded every 4th footstep, except the very first
+    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
+    if step > 0:
+      if step % 3 == 0 and not self.footstep_checkpoint_given:
+        self.footstep_checkpoint_given = True
+        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint']
+        print(f"reward for reaching step {step}")
+      elif step % 3 > 0:
+        self.footstep_checkpoint_given = False
 
-    ismpc_state = self.node.retrieve_state()
+   # ismpc_state = self.node.retrieve_state()
 
     # forward bonus
     #current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
@@ -639,3 +653,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     random_body_name, random_body = random.choice(list(nodes.items()))
       
     return random_force, random_point, random_body, random_body_name
+  
+  def end_of_plan_condition(self):
+    return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
