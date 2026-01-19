@@ -242,6 +242,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     truncated = self.current_step > self.max_steps or \
                 self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 5)  # truncate the termination because to long
 
+    if terminated or truncated:
+        print(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})")
     # log and plot
     if self.show_plot:
       self.UpdatePlot()
@@ -264,6 +266,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The resetted state for begin the simulation and the dictionary with interesting infos
     :rtype: tuple [state: Any | info: dict[str, Any]]
     '''
+
     self.angle_x = 0.0
     self.angle_y = 0.0
     
@@ -484,7 +487,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
     # compute the current reward
-    current_reward = 0.0 + self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated else \
+
+    terminated_status = self.node.mpc.sol.stats()["return_status"]
+    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated_status == 'maximum iterations reached' else self.REWARD_FUNC_CONSTANTS['terminated_penalty']*0.5
+    current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
     
     # if not enough state for compute the reward return 0
@@ -529,7 +535,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
-    print(f"Total Reward up to now: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})")
     return current_reward
 
   def UpdatePlot(self) -> None:
