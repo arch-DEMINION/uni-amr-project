@@ -105,7 +105,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'action_weight_sw'  : 0.1,
     'action_weight_ds'  : 0.2,
     'action_damping' : 0.1,
-    'r_forward' : 10.0
+    'r_forward' : 10.0,
+    'end_of_plan' : 100,
+    'footstep_checkpoint' : 5
   }
 
   PERTURBATION_PARAMETHERS = {
@@ -191,6 +193,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: tuple [state: np.array | reward: float | termination: bool | truncation: bool | info: dict[str, Any]]
     '''
 
+    self.render_ = True
     if self.verbose: print(f"taking a step using action: {action}")
 
     # convert and use the action
@@ -278,6 +281,25 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.current_step = 0
     self.current_MPC_step = 0
     self.episodes += 1
+    
+    self.footstep_checkpoint_given = False
+    self.initial_foot_dist = np.linalg.norm(self.node.initial['lfoot']['pos'][:3] - self.node.initial['rfoot']['pos'][:3], ord=2)
+
+    # advance in the world until the first foot starts moving
+    # this is to avoid having the agent work before MPC starts working and the robot cannot move
+    '''    
+    def robot_moving() -> bool:
+      foot = self.node.footstep_planner.plan[0]['foot_id']
+      state = self.node.retrieve_state()
+      initial = self.node.initial[foot]['pos']
+      foot_pos = state[foot]['pos']
+      return foot_pos[5] >= initial[5] + 1e-2
+    
+    while not robot_moving():
+      self.node.customPreStep()
+      self.world.step()
+      self.render()
+    '''  
     print("\nStarting episode: " + str(self.episodes) + "\n")
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
@@ -301,6 +323,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     print('Environment closed, to be implemented')
 
 # UTILS METHODS FOR EXTRACTING INFORMATION FROM THE ENVIRONEMNT AND PROCESS DATA
+
 
   def GetState(self) -> tuple[np.array, dict[str, any]]:
     '''

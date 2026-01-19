@@ -36,7 +36,7 @@ def SB3_test() -> None:
 
 def main() -> None:
     
-    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=10)
+    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=400, frequency_change_grav=10)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, n_stack=1)
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=100.0)
