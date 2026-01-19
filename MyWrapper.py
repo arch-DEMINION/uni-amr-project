@@ -464,6 +464,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # reward for reaching end of plan
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']   
+      print("end of plan reached")
     # reward for checkpoints in the plan
     # hardcoded every 4th footstep, except the very first
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
@@ -471,6 +472,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
         current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint']
+        print(f"reward for reaching step {step}")
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
 
