@@ -119,7 +119,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'gravity_y_range' : np.array([0.06, 0.12]) * 0.3,
     'gravity_change_prob' : 1 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 5.0,  # 1%
-    'force_range': np.array([50, 150]) * 3,   # Newton
+    'force_range': np.array([50, 150]) * 1.5,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -253,6 +253,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     if terminated or truncated:
         print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})", self.COLOR_CODE['reward']))
+        #print(self.node.world.getGravity())
     # log and plot
     if self.show_plot:
       self.UpdatePlot()
@@ -533,13 +534,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep
     
+    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
       print(colored("end of plan reached", self.COLOR_CODE["checkpoint"]))
     # reward for checkpoints in the plan
     # hardcoded every 4th footstep, except the very first
-    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
-    if step > 0:
+    if step > 0 or self.end_of_plan_condition():
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
         current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint'] * step * 0.333

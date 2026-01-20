@@ -67,8 +67,8 @@ def main() -> None:
         s = env.reset()
 
         for _ in range(1500):
-            #action, _states = model.predict(s, deterministic=False)
-            action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
+            action, _states = model.predict(s, deterministic=True)
+            #action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
             s, r, done, info = env.step(action)
 
             #if done: break
