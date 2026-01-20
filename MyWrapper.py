@@ -224,6 +224,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.node.customPreStep()
         self.world.step()
         self.current_MPC_step += 1
+        self.status = self.node.mpc.sol.stats()["return_status"]
         # render and plot updating
         
         if i == self.mpc_frequency-1 and np.random.random() < self.PERTURBATION_PARAMETHERS['ext_force_appl_prob']:
@@ -411,6 +412,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     oerr_pivot = pivot.getTransform().rotation()@oerr
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
+    angle_ground = np.array([self.angle_x, self.angle_y])
 
     angle_ground = np.array([self.angle_x, self.angle_y])
     # compute the state as a np.array and as a dictionary
