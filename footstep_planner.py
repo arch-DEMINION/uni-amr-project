@@ -102,3 +102,9 @@ class FootstepPlanner:
             self.plan[i]['ang'] += D_ang
             D_pos *= scaler
             D_ang *= scaler
+
+    def get_current_footstep_from_plan(self, time : float) -> dict:
+        '''
+        Return the current footstep from the plan at time time
+        '''
+        return self.plan[self.get_step_index_at_time(time)]

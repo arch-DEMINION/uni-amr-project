@@ -111,11 +111,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.06*2])*0, # [3,4°, 6,8°]
-    'gravity_y_range' : np.array([0.06, 0.06*2])*0,
+    'gravity_x_range' : np.array([0.06, 0.06*2])*0.5, # [3,4°, 6,8°]
+    'gravity_y_range' : np.array([0.06, 0.06*2])*0.5,
     'gravity_change_prob' : 0 * 0.01, # 3%
     'ext_force_appl_prob': 0.00333,  # 1%
-    'force_range': np.array([10, 150])*1,   # Newton
+    'force_range': np.array([50, 150])*1,   # Newton
     'CoM_offset_range': np.array([0.01, 0.1]) # meters from the CoM of the body
   }
 
@@ -253,7 +253,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
 
-
   def reset(self, *, seed : int | None = None, options = None,) -> tuple[np.array, dict[str, any]]:
     '''
     Method for reset the simulation to the initial paramethers
@@ -324,7 +323,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     print('Environment closed, to be implemented')
 
 # UTILS METHODS FOR EXTRACTING INFORMATION FROM THE ENVIRONEMNT AND PROCESS DATA
-
 
   def GetState(self) -> tuple[np.array, dict[str, any]]:
     '''
@@ -646,8 +644,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * (np.random.random() * (range_x[1] - range_x[0])) + range_x[0]  # from 3,4° to 6,8°
       
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
-    
-    
+      
   def Get_random_force(self, range_f : list[float, float], range_p : list[float, float]) -> None:
     '''
     Method for applying a random force on a random point of the robot at a certain time step
@@ -671,11 +668,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     random_point = np.array([random_point_x , random_point_y, random_point_z])
     
     nodes = {
-        "l_sole": self.node.lsole,
-        "r_sole": self.node.rsole,
+        "sole": self.node.lsole if self.node.footstep_planner.get_current_footstep_from_plan(self.node.time)['foot_id'] == 0.1 else self.node.rsole, # in the sole that is swinging
         "torso": self.node.torso,
         "body":  self.node.base
     }
+
+    if self.node.footstep_planner.get_phase_at_time(self.node.time) == "ds": nodes.pop('sole') # remove sole if is in double support
     random_body_name, random_body = random.choice(list(nodes.items()))
       
     return random_force, random_point, random_body, random_body_name
