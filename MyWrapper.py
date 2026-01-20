@@ -187,7 +187,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.02    , high = 0.02   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.05    , high = 0.05   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -311,7 +311,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       foot_pos = state[foot]['pos']
       return foot_pos[5] >= initial[5] + 1e-2
     
-    while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= 1:
+    # BYPASSED !!!!!
+    while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= 1 and False:
       self.node.customPreStep()
       self.world.step()
       self.render()

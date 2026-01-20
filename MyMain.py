@@ -35,29 +35,30 @@ def SB3_test() -> None:
     print(total_rew/tranchs)
 
 
-def main() -> None:
+def main(train = False, load = False) -> None:
     
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, n_stack=4)
-    #env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=100.0)
     
-    #model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
+    if load == '':
+        env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=100.0, clip_reward=500)
+        model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
+    else:
+        env = VecNormalize.load("vec_normalized.pkl", env)
+        model = PPO.load("ppo_hrp4_multienv", env)
     
-    #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
-    env = VecNormalize.load("vec_normalized.pkl", env)
-    model = PPO.load("ppo_hrp4_multienv", env)
-    #print("start training")
     #new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
     #model.set_logger(new_logger)
 
-    '''
-    for _ in range(10):
-        model.learn(total_timesteps=1024)  
-        model.save('ppo_hrp4')
-        env.save("env_normalized.pkl")
-        print('saved' + ' @'*20)
-    '''
+    if train:
+        #print("start training")
+        for _ in range(10):
+            model.learn(total_timesteps=1024)  
+            model.save('ppo_hrp4')
+            env.save("env_normalized.pkl")
+            print('saved' + ' @'*20)
+    
     
     print("start simulations")
     env.training = False
@@ -67,8 +68,8 @@ def main() -> None:
         s = env.reset()
 
         for _ in range(1500):
-            action, _states = model.predict(s, deterministic=True)
-            #action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
+            #action, _states = model.predict(s, deterministic=True)
+            action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
             s, r, done, info = env.step(action)
 
             #if done: break
@@ -81,5 +82,5 @@ def main() -> None:
 
 if __name__ == "__main__":
 
-    main()
+    main(train = False, load = True)
     #SB3_test() # test for stable baseline 3
