@@ -45,19 +45,19 @@ def main() -> None:
     #model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     
     #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
-    model = PPO.load("ppo_hrp4_multienv3")
     env = VecNormalize.load("vec_normalized.pkl", env)
+    model = PPO.load("ppo_hrp4_multienv3", env)
     #print("start training")
     #new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
     #model.set_logger(new_logger)
 
-    '''
+    
     for _ in range(10):
         model.learn(total_timesteps=1024)  
         model.save('ppo_hrp4')
         env.save("env_normalized.pkl")
         print('saved' + ' @'*20)
-    '''
+    
     
     print("start simulations")
     env.training = False

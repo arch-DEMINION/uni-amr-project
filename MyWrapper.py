@@ -15,6 +15,7 @@ import filter
 import foot_trajectory_generator as ftg
 import random
 from logger import Logger
+import utils
 
 import simulation
 
@@ -111,11 +112,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.06*2])*1, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.06*2])*1,
-    'gravity_change_prob' : 0 * 0.01, # 0%
-    'ext_force_appl_prob': 0.00333 * 5,  # 1%
-    'force_range': np.array([50, 150])*2,   # Newton
+    'gravity_x_range' : np.array([0.06, 0.12]) * 1, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 1,
+    'gravity_change_prob' : 1 * 0.01, # 1%
+    'ext_force_appl_prob': 0.00333 * 5.0,  # 1%
+    'force_range': np.array([50, 150]) * 1.5,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -247,8 +248,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.UpdatePlot()
 
     # sometimes change the gravity a very bit (1/10 of the intended perturbation)
-   # if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
-  #    self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETHERS['gravity_y_range']*0.1, True)
+    if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
+      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.2, self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.2, additive = True, apply_gravity=False)
+      self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
 
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
@@ -264,11 +266,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: tuple [state: Any | info: dict[str, Any]]
     '''
 
-    self.angle_x = 0.0
-    self.angle_y = 0.0
-    
-    if (self.episodes % self.frequency_change_of_grav) == 0:
-      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'])
+    # the first steps must be unperturbed for make the solver be able to do it
+    pre_value = (self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'])
+    self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = (0, 0)
+
+    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_)
     self.is_plot_init = False
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
@@ -299,7 +301,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.node.customPreStep()
       self.world.step()
       self.render()
-      
+
+    self.angle_x = 0.0
+    self.angle_y = 0.0
+    
+    if (self.episodes % self.frequency_change_of_grav) == 0:
+      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'], apply_gravity=False)
+      self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
+
+    # restore the perturbations
+    self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = pre_value 
     print("\nStarting episode: " + str(self.episodes) + "\n")
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
@@ -628,7 +639,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     return action_penalty
   
-  def ChangeGravity(self, range_x : list[float, float], range_y : list[float, float], additive : bool = False) -> None:
+  def ChangeGravity(self, range_x : list[float, float], range_y : list[float, float], additive : bool = False, apply_gravity = True) -> None:
     '''
     Method for changing the gravity in a given interval positive or negative
 
@@ -643,7 +654,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.angle_y = self.angle_y*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_y[1] - range_y[0])) + range_y[0])  #0.0
     self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_x[1] - range_x[0])) + range_x[0])  # from 3,4° to 6,8°
       
-    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
+    if apply_gravity: self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
       
   def Get_random_force(self, range_f : list[float, float], range_p : list[float, float]) -> None:
     '''

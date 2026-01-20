@@ -154,3 +154,8 @@ def incline_floor(angle_x: float, angle_y : float):
     world.setGravity([-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)])
         
     return world
+
+def decompose_gravity(angle_x, angle_y) -> list[float, float, float]:
+    g = 9.81
+    return [-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)]
+    
