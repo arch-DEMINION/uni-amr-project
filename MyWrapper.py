@@ -111,12 +111,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.06*2])*0.5, # [3,4°, 6,8°]
-    'gravity_y_range' : np.array([0.06, 0.06*2])*0.5,
-    'gravity_change_prob' : 0 * 0.01, # 3%
-    'ext_force_appl_prob': 0.00333,  # 1%
-    'force_range': np.array([50, 150])*1,   # Newton
-    'CoM_offset_range': np.array([0.01, 0.1]) # meters from the CoM of the body
+    'gravity_x_range' : np.array([0.06, 0.06*2])*1, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.06*2])*1,
+    'gravity_change_prob' : 0 * 0.01, # 0%
+    'ext_force_appl_prob': 0.00333 * 5,  # 1%
+    'force_range': np.array([50, 150])*2,   # Newton
+    'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
   def __init__(self, 
@@ -295,7 +295,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       foot_pos = state[foot]['pos']
       return foot_pos[5] >= initial[5] + 1e-2
     
-    while not robot_moving():
+    while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= 1:
       self.node.customPreStep()
       self.world.step()
       self.render()
@@ -517,7 +517,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     if step > 0:
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
-        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint']
+        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint'] * step * 0.333
         print(f"reward for reaching step {step}")
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
@@ -680,5 +680,4 @@ class ISMPC2gym_env_wrapper(gym.Env):
   
   def end_of_plan_condition(self):
     return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
-  
   

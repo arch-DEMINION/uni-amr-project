@@ -45,7 +45,7 @@ def main() -> None:
     #model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     
     #model = PPO("MlpPolicy", env, verbose=2, n_steps=128, n_epochs=3, ent_coef=0.01, learning_rate=1e-3)
-    model = PPO.load("ppo_hrp4_multienv4")
+    model = PPO.load("ppo_hrp4_multienv3")
     env = VecNormalize.load("vec_normalized.pkl", env)
     #print("start training")
     #new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
@@ -67,8 +67,8 @@ def main() -> None:
         s = env.reset()
 
         for _ in range(1500):
-            action, _states = model.predict(s, deterministic=True)
-            #action = np.array([0.0005, 0.0, 0.0]) # send action just to make the robot going forward
+            #action, _states = model.predict(s, deterministic=False)
+            action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
             s, r, done, info = env.step(action)
 
             if done: 
