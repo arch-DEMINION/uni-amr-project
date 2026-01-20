@@ -19,6 +19,9 @@ import utils
 
 import simulation
 
+import colorama
+from termcolor import colored
+
 class ISMPC2gym_env_wrapper(gym.Env):
   '''
   Class that is a wrapper for the ismpc environment for converting it in a gymnasium environment
@@ -112,12 +115,19 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 0.5, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 0.5,
+    'gravity_x_range' : np.array([0.06, 0.12]) * 0.3, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 0.3,
     'gravity_change_prob' : 1 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 5.0,  # 1%
-    'force_range': np.array([50, 150]) * 1,   # Newton
+    'force_range': np.array([50, 150]) * 3,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
+  }
+
+  COLOR_CODE = {
+    'forces'   : 'blue',
+    'exception' : 'red',
+    'reward'   : 'green',
+    'checkpoint' : 'magenta'
   }
 
   def __init__(self, 
@@ -168,6 +178,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.episodes = 0
     self.frequency_change_of_grav = frequency_change_grav
     
+    colorama.init()
     state , _ = self.reset()
 
     # size of the observation and action spaces
@@ -176,7 +187,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.015    , high = 0.015   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.02    , high = 0.02   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -220,15 +231,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
           random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETHERS['force_range'], self.PERTURBATION_PARAMETHERS['CoM_offset_range'])
           random_body.addExtForce(random_force, random_point, True)
           #if self.verbose: print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
-          print("\nApplied force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
-          
+          print(colored(f"\nApplied force: {random_force} at body:  {random_body_name} \n", self.COLOR_CODE['forces']))
+        
+        self.status_solver = self.node.mpc.sol.stats()["return_status"]  
         self.render()
-      
-
     except Exception as e:
-      status = self.node.mpc.sol.stats()["return_status"]
-      print("Failure during simulation: "+ str(status))
-     # print(e)
+      self.status_solver = str(e).split("'")[-2]
+      print(colored(f"Failure during simulation: {self.status_solver}", self.COLOR_CODE['exception']))
       terminated = True
 
     # collect the state and the reward
@@ -242,7 +251,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     truncated = self.current_step > self.max_steps or self.end_of_plan_condition()    # truncate the termination because to long
 
     if terminated or truncated:
-        print(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})")
+        print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})", self.COLOR_CODE['reward']))
     # log and plot
     if self.show_plot:
       self.UpdatePlot()
@@ -278,6 +287,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
     self.previous_rewards = []
 
+    self.angle_x = 0.0
+    self.angle_y = 0.0
+
     # reset the states and steps
     state_array, state_dict = self.GetState()
     self.current_step = 0
@@ -301,9 +313,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.node.customPreStep()
       self.world.step()
       self.render()
-
-    self.angle_x = 0.0
-    self.angle_y = 0.0
     
     if (self.episodes % self.frequency_change_of_grav) == 0:
       self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'], apply_gravity=False)
@@ -403,6 +412,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
 
+    angle_ground = np.array([self.angle_x, self.angle_y])
     # compute the state as a np.array and as a dictionary
     state_dict = {
       'support_foot': support_foot,
@@ -423,6 +433,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'next_footstep_relpos': next_footstep_relpos,
       'support_foot_next_relpos': support_foot_next_relpos,
       # 'previous_action': list(self.previous_actions[-1]['list'])
+      'angle_ground' : angle_ground
     }
     state_array = np.concatenate(list(state_dict.values()))
 
@@ -495,8 +506,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
     # compute the current reward
 
-    terminated_status = self.node.mpc.sol.stats()["return_status"]
-    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated_status == 'maximum iterations reached' else self.REWARD_FUNC_CONSTANTS['terminated_penalty']*0.5
+    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.status_solver == 'maximum iterations reached' else \
+                         self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.status_solver == 'solved inaccurate'          else 0
+    
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
     
@@ -521,7 +533,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
-      print("end of plan reached")
+      print(colored("end of plan reached", self.COLOR_CODE["checkpoint"]))
     # reward for checkpoints in the plan
     # hardcoded every 4th footstep, except the very first
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
@@ -529,7 +541,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
         current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint'] * step * 0.333
-        print(f"reward for reaching step {step}")
+        print(colored(f"reward for reaching step {step}", self.COLOR_CODE["checkpoint"]))
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
 

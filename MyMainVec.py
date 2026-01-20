@@ -15,19 +15,21 @@ def main() -> None:
     
     vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs=8, env_kwargs={"verbose": False, "render": False, "frequency_change_grav" : 1}, vec_env_cls=SubprocVecEnv)
     vec_env = VecFrameStack(vec_env, n_stack=4)
-    vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=100.0, clip_reward=500)
-
-    model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
-
-    #vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)
-    #model = PPO.load("ppo_hrp4_multienv3", vec_env)
+    
+    # for new wnvironment
+    #vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=100.0, clip_reward=500)
+    #model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
+    
+    # for loading 
+    vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)
+    model = PPO.load("ppo_hrp4_multienv", vec_env)
     
     print("start training")
     new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
     model.set_logger(new_logger)
     for i in range(1001):
         model.learn(total_timesteps=2048)
-        model.save(f"ppo_hrp4_multienv{i%5}")
+        model.save(f"ppo_hrp4_multienv")
         vec_env.save("vec_normalized.pkl")
         print(f"last save: ppo_hrp4_multienv{i%5}" + " @"*20)
         
