@@ -20,7 +20,7 @@ def main() -> None:
     model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=32, ent_coef=0.05, n_epochs=2)
 
     # i=4
-    # model.load(f"ppo_hrp4_multienv{i}")
+    model.load(f"ppo_hrp4_multienv0.zip")
     # vec_env = VecNormalize.load(f"vec_normalized{i}.pkl", vec_env)
     # model.load("ppo_hrp4_multienv1_checkpoint_reward95.zip")
     # vec_env = VecNormalize.load("vec_normalized_checkpoint_reward95.pkl", vec_env)
@@ -29,7 +29,7 @@ def main() -> None:
     new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
     model.set_logger(new_logger)
     for i in range(1000):
-        model.learn(total_timesteps=4096*8)
+        model.learn(total_timesteps=8192)
         model.save(f"ppo_hrp4_multienv{i%5}")
         print(f"last save: ppo_hrp4_multienv{i%5}" + "@"*20)
     print("end training")
