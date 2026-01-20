@@ -112,11 +112,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 1, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 1,
+    'gravity_x_range' : np.array([0.06, 0.12]) * 0.5, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 0.5,
     'gravity_change_prob' : 1 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 5.0,  # 1%
-    'force_range': np.array([50, 150]) * 1.5,   # Newton
+    'force_range': np.array([50, 150]) * 1,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -418,7 +418,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
      # 'zmp_vel_desired': self.node.desired['zmp']['vel'],
       'angular_momentum': L,
-      # 'angular_momentum_drv': Ldot,
+      'angular_momentum_drv': Ldot,
       # 'support_foot_pos': support_foot_pos,
       'next_footstep_relpos': next_footstep_relpos,
       'support_foot_next_relpos': support_foot_next_relpos,
@@ -666,20 +666,20 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :type range_f: list[float, float]
     '''
 
-    random_force_x = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0]))) + range_f[0] 
-    random_force_y = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0]))) + range_f[0] 
-    random_force_z = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0]))) + range_f[0] 
+    random_force_x = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0])) + range_f[0]) 
+    random_force_y = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0])) + range_f[0])
+    random_force_z = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0])) + range_f[0])
     
     random_force = np.array([random_force_x , random_force_y, random_force_z])
     
-    random_point_x = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0]))) + range_p[0] 
-    random_point_y = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0]))) + range_p[0] 
-    random_point_z = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0]))) + range_p[0] 
+    random_point_x = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0])) + range_p[0]) 
+    random_point_y = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0])) + range_p[0])
+    random_point_z = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0])) + range_p[0]) 
     
     random_point = np.array([random_point_x , random_point_y, random_point_z])
     
     nodes = {
-        "sole": self.node.lsole if self.node.footstep_planner.get_current_footstep_from_plan(self.node.time)['foot_id'] == 0.1 else self.node.rsole, # in the sole that is swinging
+        "sole": self.node.rsole if self.node.footstep_planner.get_current_footstep_from_plan(self.node.time)['foot_id'] == 0.1 else self.node.lsole, # in the sole that is swinging
         "torso": self.node.torso,
         "body":  self.node.base
     }

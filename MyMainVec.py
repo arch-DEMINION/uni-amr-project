@@ -19,8 +19,8 @@ def main() -> None:
 
     model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
 
-    vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)
-    model = PPO.load("ppo_hrp4_multienv3", vec_env)
+    #vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)
+    #model = PPO.load("ppo_hrp4_multienv3", vec_env)
     
     print("start training")
     new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
