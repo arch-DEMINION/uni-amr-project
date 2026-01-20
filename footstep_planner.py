@@ -98,8 +98,8 @@ class FootstepPlanner:
            starting_index += 1
 
         # modify only the next footstep
-        self.plan[starting_index]['pos'] += D_pos 
-        self.plan[starting_index]['ang'] += D_ang        
+        # self.plan[starting_index]['pos'] += D_pos 
+        # self.plan[starting_index]['ang'] += D_ang        
 
         # modify the whole plan from now
         for i in range(starting_index, len(self.plan)):
