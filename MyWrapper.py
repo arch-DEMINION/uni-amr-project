@@ -640,8 +640,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :type additive: bool
     '''
 
-    self.angle_y = self.angle_y*additive + np.random.choice([-1, 1]) * (np.random.random() * (range_y[1] - range_y[0])) + range_y[0]  #0.0
-    self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * (np.random.random() * (range_x[1] - range_x[0])) + range_x[0]  # from 3,4° to 6,8°
+    self.angle_y = self.angle_y*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_y[1] - range_y[0])) + range_y[0])  #0.0
+    self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_x[1] - range_x[0])) + range_x[0])  # from 3,4° to 6,8°
       
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
       
@@ -655,15 +655,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :type range_f: list[float, float]
     '''
 
-    random_force_x = np.random.choice([-1, 1]) * (np.random.random() * (range_f[1] - range_f[0])) + range_f[0] 
-    random_force_y = np.random.choice([-1, 1]) * (np.random.random() * (range_f[1] - range_f[0])) + range_f[0] 
-    random_force_z = np.random.choice([-1, 1]) * (np.random.random() * (range_f[1] - range_f[0])) + range_f[0] 
+    random_force_x = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0]))) + range_f[0] 
+    random_force_y = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0]))) + range_f[0] 
+    random_force_z = np.random.choice([-1, 1]) * ((np.random.random() * (range_f[1] - range_f[0]))) + range_f[0] 
     
     random_force = np.array([random_force_x , random_force_y, random_force_z])
     
-    random_point_x = np.random.choice([-1, 1]) * (np.random.random() * (range_p[1] - range_p[0])) + range_p[0] 
-    random_point_y = np.random.choice([-1, 1]) * (np.random.random() * (range_p[1] - range_p[0])) + range_p[0] 
-    random_point_z = np.random.choice([-1, 1]) * (np.random.random() * (range_p[1] - range_p[0])) + range_p[0] 
+    random_point_x = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0]))) + range_p[0] 
+    random_point_y = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0]))) + range_p[0] 
+    random_point_z = np.random.choice([-1, 1]) * ((np.random.random() * (range_p[1] - range_p[0]))) + range_p[0] 
     
     random_point = np.array([random_point_x , random_point_y, random_point_z])
     
@@ -680,3 +680,5 @@ class ISMPC2gym_env_wrapper(gym.Env):
   
   def end_of_plan_condition(self):
     return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
+  
+  
