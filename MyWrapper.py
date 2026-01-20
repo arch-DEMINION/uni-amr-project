@@ -261,7 +261,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       foot_pos = state[foot]['pos']
       return foot_pos[5] >= initial[5] + 1e-2
     
-    while not robot_moving():
+    # while not robot_moving():
+    while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= 1:
       self.node.customPreStep()
       self.world.step()
       self.render()
@@ -468,7 +469,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # reward for checkpoints in the plan
     # hardcoded every 4th footstep, except the very first
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
-    if step > 0:
+    if step > 2:
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
         current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint']
