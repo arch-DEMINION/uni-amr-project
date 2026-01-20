@@ -213,6 +213,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.node.customPreStep()
         self.world.step()
         self.current_MPC_step += 1
+        self.status = self.node.mpc.sol.stats()["return_status"]
         # render and plot updating
         
         if i == self.mpc_frequency-1 and np.random.random() < self.PERTURBATION_PARAMETHERS['ext_force_appl_prob']:
@@ -226,9 +227,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
       
 
     except Exception as e:
-      status = self.node.mpc.sol.stats()["return_status"]
-      print("Failure during simulation: "+ str(status))
-     # print(e)
+      
+      e = str(e).split("'")
+      self.status = (e[1])
+      print("Failure during simulation: "+ str(self.status))
+      
       terminated = True
 
     # collect the state and the reward
@@ -277,6 +280,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.previous_states  = []
     self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
     self.previous_rewards = []
+    
+    self.angle_x = 0.0
+    self.angle_y = 0.0
 
     # reset the states and steps
     state_array, state_dict = self.GetState()
@@ -301,9 +307,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.node.customPreStep()
       self.world.step()
       self.render()
-
-    self.angle_x = 0.0
-    self.angle_y = 0.0
     
     if (self.episodes % self.frequency_change_of_grav) == 0:
       self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'], apply_gravity=False)
@@ -402,6 +405,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     oerr_pivot = pivot.getTransform().rotation()@oerr
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
+    angle_ground = np.array([self.angle_x, self.angle_y])
 
     # compute the state as a np.array and as a dictionary
     state_dict = {
@@ -423,6 +427,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'next_footstep_relpos': next_footstep_relpos,
       'support_foot_next_relpos': support_foot_next_relpos,
       # 'previous_action': list(self.previous_actions[-1]['list'])
+      'angle_grond': angle_ground,
     }
     state_array = np.concatenate(list(state_dict.values()))
 
@@ -495,8 +500,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
     # compute the current reward
 
-    terminated_status = self.node.mpc.sol.stats()["return_status"]
-    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated_status == 'maximum iterations reached' else self.REWARD_FUNC_CONSTANTS['terminated_penalty']*0.5
+    
+    terminated_penalty = (self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if self.status == 'maximum iterations reached' else \
+      self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.status == 'solved inaccurate'\
+      else 0
+      )
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
     
