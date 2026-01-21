@@ -117,11 +117,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 0.2, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 0.2,
+    'gravity_x_range' : np.array([0.06, 0.12]) * 0.4, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 0.4,
     'gravity_change_prob' : 1 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]) * 0.5,   # Newton
+    'force_range': np.array([50, 150]) * 1,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
