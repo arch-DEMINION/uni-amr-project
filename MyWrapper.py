@@ -84,7 +84,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_rewards : list[ float            ]
 
   REWARD_FUNC_CONSTANTS = {
-          'r_alive' : 1.0,
+          'r_alive' : 2.0,
     
             'w_ZmP' : 0.3,
         'sigma_ZmP' : 0.1,
@@ -103,7 +103,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
           'w_footstep' : 2,
       'sigma_footstep' : 0.2,#0.12,
 
-    'terminated_penalty' : -100.0,
+    'terminated_penalty' : -50.0,
     'CoM_H_perc_safe' : 0.1,
 
     'action_weight_sw'  : 0.1,
@@ -111,15 +111,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'action_damping' : 0.1,
     'r_forward' : 10.0,
     'end_of_plan' : 100,
-    'footstep_checkpoint' : 5
+    'footstep_checkpoint' : 10
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 0.3, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 0.3,
+    'gravity_x_range' : np.array([0.06, 0.12]) * 0.2, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 0.2,
     'gravity_change_prob' : 1 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]) * 1,   # Newton
+    'force_range': np.array([50, 150]) * 0.5,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -138,8 +138,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                show_plot   : bool = False,
                plot_rate   : int  = 100,
                verbose     : bool = False,
-               mpc_frequency : int = 5,
-               agent_frequency : int = 2,
+               mpc_frequency : int = 10,
+               agent_frequency : int = 1,
                frequency_change_grav : int = 1):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
@@ -189,7 +189,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -3    , high = 3   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -0.02    , high = 0.02   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -222,8 +222,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       start_time = self.node.time
       self.ApplyAction(action_dict)
 
-      #for i in range(self.mpc_frequency):
-      while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= starting_step: # until is completed a step
+      for i in range(self.mpc_frequency):
+      #while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= starting_step: # until is completed a step
         
         self.node.customPreStep()
         self.world.step()
@@ -234,7 +234,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.status_solver = self.node.mpc.sol.stats()["return_status"]  
         self.render()
 
-        if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss' and self.node.time > start_time + self.node.footstep_planner.get_current_footstep_from_plan(self.node.time)['ss_duration'] * 1/self.agent_frequency: break
+        #if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss' and self.node.time > start_time + self.node.footstep_planner.get_current_footstep_from_plan(self.node.time)['ss_duration'] * 1/self.agent_frequency: break
       
       # apply the froces 
       if np.random.random() < self.PERTURBATION_PARAMETHERS['ext_force_appl_prob']:
@@ -247,6 +247,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         
       
     except Exception as e:
+      print(e)
       self.status_solver = str(e).split("'")[-2]
       print(colored(f"Failure during simulation: {self.status_solver}", self.COLOR_CODE['exception']))
       terminated = True
@@ -270,7 +271,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # sometimes change the gravity a very bit (1/10 of the intended perturbation)
     if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
-      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.2, self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.2, additive = True, apply_gravity=False)
+      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, additive = True, apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
 
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
@@ -424,7 +425,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     oerr_pivot = (pivot.getTransform().rotation()@oerr)[0:3]
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
-    angle_ground = np.array([self.angle_x, self.angle_y])
 
     angle_ground = np.array([self.angle_x, self.angle_y])
     # compute the state as a np.array and as a dictionary
@@ -432,9 +432,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'support_foot': support_foot,
       'remaining_time': np.array([remaining_time]),
       'com_pos':  ismpc_state['com']['pos'],
-      'com_vel':  ismpc_state['com']['vel'],
+      #'com_vel':  ismpc_state['com']['vel'],
       'zmp_pos':  ismpc_state['zmp']['pos'],
-      'zmp_vel':  ismpc_state['zmp']['vel'],
+      #'zmp_vel':  ismpc_state['zmp']['vel'],
       #'torso_orient': ismpc_state['torso']['pos'],
       # 'torso_angvel': ismpc_state['torso']['vel'],
      # 'base_orient': ismpc_state['base']['pos'],
@@ -442,10 +442,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
      # 'zmp_vel_desired': self.node.desired['zmp']['vel'],
       'angular_momentum': L,
-      'angular_momentum_drv': Ldot,
+      #'angular_momentum_drv': Ldot,
       # 'support_foot_pos': support_foot_pos,
       'next_footstep_relpos': next_footstep_relpos,
-      'support_foot_next_relpos': support_foot_next_relpos,
+      #'support_foot_next_relpos': support_foot_next_relpos,
       # 'previous_action': list(self.previous_actions[-1]['list'])
       'angle_ground' : angle_ground
     }

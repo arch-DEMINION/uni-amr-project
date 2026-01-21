@@ -35,7 +35,7 @@ def SB3_test() -> None:
     print(total_rew/tranchs)
 
 
-def main(train = False, load = False) -> None:
+def main(train = False, load = False, custom_action = True) -> None:
     
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1)
     env = DummyVecEnv([lambda: env])
@@ -68,8 +68,9 @@ def main(train = False, load = False) -> None:
         s = env.reset()
 
         for _ in range(1500):
-            action, _states = model.predict(s, deterministic=True)
-            #action = np.array([[0.0, 0.01, 0.05]]) # send action just to make the robot going forward
+            
+            if custom_action: action = np.array([[0.001, 0.0, 0.01]]) # send action just to make the robot going forward
+            else: action, _states = model.predict(s, deterministic=True)
             s, r, done, info = env.step(action)
 
             #if done: break
@@ -82,5 +83,5 @@ def main(train = False, load = False) -> None:
 
 if __name__ == "__main__":
 
-    main(train = True, load = False)
+    main(train = True, load = False, custom_action = False)
     #SB3_test() # test for stable baseline 3
