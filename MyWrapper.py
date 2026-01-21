@@ -157,6 +157,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.plot_rate   = plot_rate
     self.verbose     = verbose
     self.mpc_frequency = mpc_frequency
+    self.solver_status = ""
     
     state , _ = self.reset()
 
@@ -204,8 +205,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.render()
 
     except Exception as e:
-      print("Failure during simulation")
-      print(e)
+      e = str(e).split("'")
+      self.solver_status = (e[1])
+      print("Failure during simulation: "+ str(self.solver_status))
+
       terminated = True
 
     # collect the state and the reward
@@ -445,8 +448,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
     # compute the current reward
     # TODO: different penalties depending on termination reason (maximum iterations, solved inaccurate)
-    terminated_status = self.node.mpc.sol.stats()["return_status"]
-    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if terminated_status == 'maximum iterations reached' else self.REWARD_FUNC_CONSTANTS['terminated_penalty']*0.5
+    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty'] if self.solver_status == 'maximum iterations reached' else self.REWARD_FUNC_CONSTANTS['terminated_penalty']*0.5
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
     
