@@ -99,7 +99,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
      'sigma_vel_ref': 0.4,
      
           'w_footstep' : 0.5,
-      'sigma_footstep' : 0.7,
+      'sigma_footstep' : 0.11,
 
     'terminated_penalty' : -100.0,
     'CoM_H_perc_safe' : 0.1,
