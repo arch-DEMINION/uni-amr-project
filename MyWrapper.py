@@ -100,6 +100,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
+
+        'w_vel_ref':  0.5,
+     'sigma_vel_ref': 0.4,
      
           'w_footstep' : 10.0,
       'sigma_footstep' : 0.15,
@@ -431,16 +434,20 @@ class ISMPC2gym_env_wrapper(gym.Env):
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
 
     angle_ground = np.array([self.angle_x, self.angle_y])
+    
+    ref_vel = pivot.getTransform().rotation()@self.node.footstep_planner.vref[step_index]
+
     # compute the state as a np.array and as a dictionary
     state_dict = {
       'support_foot': support_foot,
       'remaining_time': np.array([remaining_time]),
       'com_pos':  ismpc_state['com']['pos'],
-      #'com_vel':  ismpc_state['com']['vel'],
+      'com_vel':  ismpc_state['com']['vel'],
       'zmp_pos':  ismpc_state['zmp']['pos'],
       #'zmp_vel':  ismpc_state['zmp']['vel'],
       #'torso_orient': ismpc_state['torso']['pos'],
       # 'torso_angvel': ismpc_state['torso']['vel'],
+      'ref_vel': ref_vel,
      # 'base_orient': ismpc_state['base']['pos'],
      # 'base_angvel': ismpc_state['base']['vel'],
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
@@ -568,22 +575,27 @@ class ISMPC2gym_env_wrapper(gym.Env):
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
 
+    # reward for CoM following desired velocities
+    com_vel = self.node.retrieve_state()['com']['vel']
+    current_reward += Ker(com_vel[0] - self.node.footstep_planner.vref[step][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    current_reward += Ker(com_vel[1] - self.node.footstep_planner.vref[step][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    
     # penalty for joints exceeding limits
-    N = self.node.hrp4.getNumJoints()
-    Hrange = 0
-    for i in range(N):
-      j = self.node.hrp4.getJoint(i)
-      qM = j.getPositionUpperLimits()
-      qm = j.getPositionLowerLimits()
-      qi = j.getPositions()
+    # N = self.node.hrp4.getNumJoints()
+    # Hrange = 0
+    # for i in range(N):
+    #   j = self.node.hrp4.getJoint(i)
+    #   qM = j.getPositionUpperLimits()
+    #   qm = j.getPositionLowerLimits()
+    #   qi = j.getPositions()
 
 
-      if qM is not None and qm is not None and qi is not None and qM.size > 0 and qm.size > 0 and qi.size > 0:
-        if any(np.isinf(qM)) or any(np.isinf(qm)):
-          continue
+    #   if qM is not None and qm is not None and qi is not None and qM.size > 0 and qm.size > 0 and qi.size > 0:
+    #     if any(np.isinf(qM)) or any(np.isinf(qm)):
+    #       continue
 
-        Hrange += utils.sigmoid(qi, -5, 40., qm)+utils.sigmoid(qi, 5, 40., qM)
-    current_reward -= Hrange[0]
+    #     Hrange += utils.sigmoid(qi, -5, 40., qm)+utils.sigmoid(qi, 5, 40., qM)
+    # current_reward -= Hrange[0]
 
 
    # ismpc_state = self.node.retrieve_state()

@@ -9,6 +9,8 @@ class FootstepPlanner:
         unicycle_pos   = (initial_lfoot[3:5] + initial_rfoot[3:5]) / 2.
         unicycle_theta = (initial_lfoot[2]   + initial_rfoot[2]  ) / 2.
         support_foot   = params['first_swing']
+        
+        self.vref = vref
         self.plan = []
 
         for j in range(len(vref)):
