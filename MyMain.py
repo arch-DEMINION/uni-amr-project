@@ -69,8 +69,8 @@ def main(train = False, load = False, custom_action = True) -> None:
 
         for _ in range(1500):
             
-            if custom_action: action = np.array([[0.001, 0.0, 0.01]]) # send action just to make the robot going forward
-            else: action, _states = model.predict(s, deterministic=True)
+            if custom_action: action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
+            else: action, _states = model.predict(s, deterministic=False)
             s, r, done, info = env.step(action)
 
             #if done: break

@@ -1,1 +1,55 @@
 Logging to ./multi.log
+---------------------------------
+| rollout/           |          |
+|    ep_len_mean     | 19.2     |
+|    ep_rew_mean     | -48.7    |
+| time/              |          |
+|    fps             | 15       |
+|    iterations      | 1        |
+|    time_elapsed    | 32       |
+|    total_timesteps | 512      |
+---------------------------------
+-----------------------------------------
+| rollout/                |             |
+|    ep_len_mean          | 23.5        |
+|    ep_rew_mean          | -29.4       |
+| time/                   |             |
+|    fps                  | 17          |
+|    iterations           | 2           |
+|    time_elapsed         | 57          |
+|    total_timesteps      | 1024        |
+| train/                  |             |
+|    approx_kl            | 0.027815511 |
+|    clip_fraction        | 0.151       |
+|    clip_range           | 0.2         |
+|    entropy_loss         | -4.26       |
+|    explained_variance   | 0.000541    |
+|    learning_rate        | 0.001       |
+|    loss                 | 3.81        |
+|    n_updates            | 2           |
+|    policy_gradient_loss | 0.000476    |
+|    std                  | 1           |
+|    value_loss           | 682         |
+-----------------------------------------
+-----------------------------------------
+| rollout/                |             |
+|    ep_len_mean          | 39.8        |
+|    ep_rew_mean          | 45.2        |
+| time/                   |             |
+|    fps                  | 17          |
+|    iterations           | 3           |
+|    time_elapsed         | 87          |
+|    total_timesteps      | 1536        |
+| train/                  |             |
+|    approx_kl            | 0.009623059 |
+|    clip_fraction        | 0.0859      |
+|    clip_range           | 0.2         |
+|    entropy_loss         | -4.25       |
+|    explained_variance   | 0.625       |
+|    learning_rate        | 0.001       |
+|    loss                 | 0.208       |
+|    n_updates            | 4           |
+|    policy_gradient_loss | -0.00833    |
+|    std                  | 0.995       |
+|    value_loss           | 0.926       |
+-----------------------------------------

@@ -84,7 +84,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_rewards : list[ float            ]
 
   REWARD_FUNC_CONSTANTS = {
-          'r_alive' : 2.0,
+          'r_alive' : 3.0,
     
             'w_ZmP' : 0.3,
         'sigma_ZmP' : 0.1,
@@ -100,18 +100,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 2,
+          'w_footstep' : 4.0,
       'sigma_footstep' : 0.2,#0.12,
 
     'terminated_penalty' : -50.0,
     'CoM_H_perc_safe' : 0.1,
 
-    'action_weight_sw'  : 0.5,
-    'action_weight_ds'  : 0.8,
+    'action_weight_sw'  : 1.0,
+    'action_weight_ds'  : 1.0,
     'action_damping' : 0.001,
     'r_forward' : 10.0,
-    'end_of_plan' : 100,
-    'footstep_checkpoint' : 10
+    'end_of_plan' : 100.0,
+    'footstep_checkpoint' : 10.0
   }
 
   PERTURBATION_PARAMETHERS = {
@@ -247,7 +247,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         
       
     except Exception as e:
-      print(e)
+      #print(e)
       self.status_solver = str(e).split("'")[-2]
       print(colored(f"Failure during simulation: {self.status_solver}", self.COLOR_CODE['exception']))
       terminated = True
@@ -548,13 +548,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
-      print(colored("end of plan reached", self.COLOR_CODE["checkpoint"]))
+      print(colored("end of plan reached", 'yellow'))
     # reward for checkpoints in the plan
     # hardcoded every 4th footstep, except the very first
     if step > 0 or self.end_of_plan_condition():
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
-        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint'] * step * 0.333
+        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint'] * (step * 0.1)
         print(colored(f"reward for reaching step {step}", self.COLOR_CODE["checkpoint"]))
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
