@@ -101,7 +101,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
      'sigma_smooth' : 0.1,
      
           'w_footstep' : 4.0,
-      'sigma_footstep' : 0.2,#0.12,
+      'sigma_footstep' : 0.15,
 
     'terminated_penalty' : -50.0,
     'CoM_H_perc_safe' : 0.1,
@@ -404,7 +404,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # position of next footstep (taken by foot opposing the current support foot) relative to the current foot position
     support_foot_gpos = self.node.retrieve_state()[support_foot_str]['pos']
-    next_footstep_pos = plan[step_index + 1]['pos'][0:1]
+    next_footstep_pos = plan[step_index + 1]['pos']
     next_footstep_ang = plan[step_index + 1]['ang'][2]
     # position of next footstep that will be taken by the current support foot relative to the current foot position
     # (second footstep from now)
@@ -542,7 +542,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       current_reward += self.R_end(state, action)
 
     # penalty for placing the foots to close
-    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep
     
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
@@ -639,7 +639,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_gamma = 0 #Ker(state['torso_orient'][2], self.REWARD_FUNC_CONSTANTS['sigma_gamma'],self.REWARD_FUNC_CONSTANTS['w_gamma'])
     
     # com_pos and self.node.mpc.h are in the same coordinate systems
-    r_ZH  = - self.REWARD_FUNC_CONSTANTS['w_ZH'] * np.abs(state['com_pos'][2] - self.node.mpc.h)
+    com_pos = self.node.retrieve_state()['com']['pos']
+    r_ZH  = - self.REWARD_FUNC_CONSTANTS['w_ZH'] * np.abs(com_pos[2] - self.node.mpc.h)
     r_phi = 0 #- self.REWARD_FUNC_CONSTANTS['w_phi'] * np.linalg.norm(state['torso_orient'][0:1], ord=2)
 
     r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
