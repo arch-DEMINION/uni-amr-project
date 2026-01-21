@@ -100,7 +100,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 4.0,
+          'w_footstep' : 10.0,
       'sigma_footstep' : 0.15,
 
     'terminated_penalty' : -50.0,
@@ -111,7 +111,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'action_damping' : 0.001,
     'r_forward' : 10.0,
     'end_of_plan' : 100.0,
-    'footstep_checkpoint' : 10.0
+    'footstep_checkpoint' : 5.0
   }
 
   PERTURBATION_PARAMETHERS = {
