@@ -110,7 +110,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'distance_bonus' : 0.45,
 
     'terminated_penalty' : -50.0,
-    'desired_footstep_penalty': 1,
+    'sigma_desired_footstep': 0.1,
+    'omega_desired_footstep': 2.5,
     'CoM_H_perc_safe' : 0.1,
 
     'action_weight_sw'  : 1.0,
@@ -709,7 +710,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
                       
     # bonus for placing the footsteps close to the desired position in the original (unmodified) plan
-    footstep_bonus = +self.REWARD_FUNC_CONSTANTS['desired_footstep_penalty']*np.dot(state['desired_footstep_relpos'], state['desired_footstep_relpos'])
+    footstep_bonus = +Ker(np.dot(state['desired_footstep_relpos'], state['desired_footstep_relpos']), self.REWARD_FUNC_CONSTANTS['sigma_desired_footstep'], self.REWARD_FUNC_CONSTANTS['omega_desired_footstep']) 
 
 
     return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + footstep_bonus
