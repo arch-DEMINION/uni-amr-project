@@ -139,6 +139,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                plot_rate   : int  = 100,
                verbose     : bool = False,
                mpc_frequency : int = 5,
+               agent_frequency : int = 2,
                frequency_change_grav : int = 1):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
@@ -177,6 +178,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.mpc_frequency = mpc_frequency
     self.episodes = 0
     self.frequency_change_of_grav = frequency_change_grav
+    self.agent_frequency = agent_frequency
     
     colorama.init()
     state , _ = self.reset()
@@ -217,6 +219,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       #if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 1: # start to modify after the 6 step of the robot
 
       starting_step = self.node.footstep_planner.get_step_index_at_time(self.node.time) # remember the starting step
+      start_time = self.node.time
       self.ApplyAction(action_dict)
 
       #for i in range(self.mpc_frequency):
@@ -230,6 +233,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
         self.status_solver = self.node.mpc.sol.stats()["return_status"]  
         self.render()
+
+        if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss' and self.node.time > start_time + self.node.footstep_planner.get_current_footstep_from_plan(self.node.time)['ss_duration'] * 1/self.agent_frequency: break
       
       # apply the froces 
       if np.random.random() < self.PERTURBATION_PARAMETHERS['ext_force_appl_prob']:
@@ -237,8 +242,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
         random_body.addExtForce(random_force, random_point, True)
         #if self.verbose: print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
         print(colored(f"\nApplied force: {random_force} at body:  {random_body_name} \n", self.COLOR_CODE['forces']))
-      
-      self.render()
+        self.world.step()
+        self.render()
         
       
     except Exception as e:
