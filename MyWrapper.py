@@ -347,6 +347,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     perr = next_footstep_pos - support_foot_gpos[3:]
     oerr = next_footstep_pos - support_foot_gpos[:3]
     perr_pivot = pivot.getTransform().matrix()@np.concatenate((perr, np.ones(1)))
+    perr_pivot = perr_pivot[0:3]
     oerr_pivot = pivot.getTransform().rotation()@oerr
     next_footstep_relpos = np.concatenate((perr_pivot, oerr_pivot))
     next_footstep_relpos = np.array([next_footstep_relpos[i] for i in [0,1,5]])  # x, y, gamma 
@@ -354,10 +355,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     perr = support_foot_next_pos - support_foot_gpos[3:]
     oerr = support_foot_next_ang - support_foot_gpos[:3]
     perr_pivot = pivot.getTransform().matrix()@np.concatenate((perr, np.ones(1)))
+    perr_pivot = perr_pivot[0:3]
     oerr_pivot = pivot.getTransform().rotation()@oerr
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
-
+    
     # compute the state as a np.array and as a dictionary
     state_dict = {
       'support_foot': support_foot,
