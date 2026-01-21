@@ -104,9 +104,9 @@ class FootstepPlanner:
         self.plan[starting_index]['disp_pos'] += D_pos
         self.plan[starting_index]['disp_ang'] += D_ang
 
-        if self.plan[starting_index]['disp_pos'][0] >= self.plan[starting_index]['max_disp_pos'][0]: D_pos[0] = 0
-        if self.plan[starting_index]['disp_pos'][1] >= self.plan[starting_index]['max_disp_pos'][1]: D_pos[1] = 0
-        if self.plan[starting_index]['disp_ang'][2] >= self.plan[starting_index]['max_disp_ang'][2]: D_ang[2] = 0
+        if np.abs(self.plan[starting_index]['disp_pos'][0]) >= self.plan[starting_index]['max_disp_pos'][0]: D_pos[0] = 0
+        if np.abs(self.plan[starting_index]['disp_pos'][1]) >= self.plan[starting_index]['max_disp_pos'][1]: D_pos[1] = 0
+        if np.abs(self.plan[starting_index]['disp_ang'][2]) >= self.plan[starting_index]['max_disp_ang'][2]: D_ang[2] = 0
 
         if D_pos[0] == 0 and D_pos[1] == 0 and D_ang == 0: return 
 

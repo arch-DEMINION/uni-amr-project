@@ -41,7 +41,7 @@ def main(train = False, load = False, custom_action = True) -> None:
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, n_stack=4)
     
-    if load == '':
+    if not load:
         env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=100.0, clip_reward=500)
         model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     else:
@@ -83,5 +83,5 @@ def main(train = False, load = False, custom_action = True) -> None:
 
 if __name__ == "__main__":
 
-    main(train = True, load = False, custom_action = False)
+    main(train = False, load = True, custom_action = False)
     #SB3_test() # test for stable baseline 3
