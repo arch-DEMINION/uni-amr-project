@@ -100,12 +100,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 10.0,
+          'w_footstep' : 5.0,
       'sigma_footstep' : 0.15,
 'sigma_footstep_bonus' : 0.2,
       'distance_bonus' : 0.45,
 
-    'terminated_penalty' : -50.0,
+    'terminated_penalty' : -100.0,
     'CoM_H_perc_safe' : 0.1,
 
     'action_weight_sw'  : 1.0,
@@ -113,7 +113,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'action_damping' : 0.001,
     'r_forward' : 10.0,
     'end_of_plan' : 100.0,
-    'footstep_checkpoint' : 3.0
+    'footstep_checkpoint' : 4.0
   }
 
   PERTURBATION_PARAMETHERS = {
@@ -121,7 +121,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'gravity_y_range' : np.array([0.06, 0.12]) * 0.4,
     'gravity_change_prob' : 1 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]) * 1,   # Newton
+    'force_range': np.array([50, 150]) * 0.6,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
