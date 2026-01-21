@@ -106,9 +106,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'terminated_penalty' : -50.0,
     'CoM_H_perc_safe' : 0.1,
 
-    'action_weight_sw'  : 0.1,
-    'action_weight_ds'  : 0.2,
-    'action_damping' : 0.1,
+    'action_weight_sw'  : 0.5,
+    'action_weight_ds'  : 0.8,
+    'action_damping' : 0.001,
     'r_forward' : 10.0,
     'end_of_plan' : 100,
     'footstep_checkpoint' : 10
