@@ -94,6 +94,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
+
+        'w_vel_ref':  0.5,
+     'sigma_vel_ref': 0.4,
      
           'w_footstep' : 0.5,
       'sigma_footstep' : 0.7,
@@ -360,6 +363,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
     
+    ref_vel = pivot.getTransform().rotation()@self.node.footstep_planner.vref[step_index]
+
     # compute the state as a np.array and as a dictionary
     state_dict = {
       'support_foot': support_foot,
@@ -369,6 +374,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'zmp_pos':  ismpc_state['zmp']['pos'],
       'zmp_vel':  ismpc_state['zmp']['vel'],
       'torso_orient': ismpc_state['torso']['pos'],
+      'ref_vel': ref_vel,
       # 'torso_angvel': ismpc_state['torso']['vel'],
      # 'base_orient': ismpc_state['base']['pos'],
      # 'base_angvel': ismpc_state['base']['vel'],
@@ -459,25 +465,31 @@ class ISMPC2gym_env_wrapper(gym.Env):
       # double support phase
       current_reward += self.R_end(state, action)
 
-    # penalty for placing the feet too close
+    # reward for placing feet at the right distance
     r_next_footstep = Ker(np.linalg.norm(state['next_footstep_relpos'][0:1], ord= 2) - self.initial_foot_dist, self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep
 
+    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
+
+    # reward for CoM following desired velocities
+    com_vel = self.node.retrieve_state()['com']['vel']
+    current_reward += Ker(com_vel[0] - self.node.footstep_planner.vref[step][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    current_reward += Ker(com_vel[1] - self.node.footstep_planner.vref[step][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+
+    # reward for checkpoints in the plan
+    # hardcoded every 4th footstep, except the very first
+    if step > 2:
+      if step % 3 == 0 and not self.footstep_checkpoint_given:
+        self.footstep_checkpoint_given = True
+        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint']*step/3
+        print(f"reward for reaching step {step}")
+      elif step % 3 > 0:
+        self.footstep_checkpoint_given = False
 
     # reward for reaching end of plan
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']   
       print("end of plan reached")
-    # reward for checkpoints in the plan
-    # hardcoded every 4th footstep, except the very first
-    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
-    if step > 2:
-      if step % 3 == 0 and not self.footstep_checkpoint_given:
-        self.footstep_checkpoint_given = True
-        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint']
-        print(f"reward for reaching step {step}")
-      elif step % 3 > 0:
-        self.footstep_checkpoint_given = False
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
