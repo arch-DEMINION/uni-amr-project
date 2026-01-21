@@ -113,7 +113,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'action_damping' : 0.001,
     'r_forward' : 10.0,
     'end_of_plan' : 100.0,
-    'footstep_checkpoint' : 5.0
+    'footstep_checkpoint' : 3.0
   }
 
   PERTURBATION_PARAMETHERS = {
@@ -265,7 +265,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     truncated = self.current_step > self.max_steps or self.end_of_plan_condition()    # truncate the termination because to long
 
     if terminated or truncated:
-        print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.2f}, {self.angle_y:0.2f})", self.COLOR_CODE['reward']))
+        print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['reward']))
         #print(self.node.world.getGravity())
     # log and plot
     if self.show_plot:
@@ -275,6 +275,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
       self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, additive = True, apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
+      print(colored(f"gravity: (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['forces']))
 
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
