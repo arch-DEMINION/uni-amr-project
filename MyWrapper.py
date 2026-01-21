@@ -102,6 +102,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
      
           'w_footstep' : 10.0,
       'sigma_footstep' : 0.15,
+'sigma_footstep_bonus' : 0.2,
+      'distance_bonus' : 0.45,
 
     'terminated_penalty' : -50.0,
     'CoM_H_perc_safe' : 0.1,
@@ -542,8 +544,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
       current_reward += self.R_end(state, action)
 
     # penalty for placing the foots to close
-    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep']) 
-    current_reward += r_next_footstep
+    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
+
+    # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
+    r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
+                                 self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
+                                 self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    current_reward += r_next_footstep + r_next_footstep_bonus
     
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     if self.end_of_plan_condition():
