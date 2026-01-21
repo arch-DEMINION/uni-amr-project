@@ -3,8 +3,8 @@ from utils import *
 
 class FootstepPlanner:
     def __init__(self, vref, initial_lfoot, initial_rfoot, params):
-        default_ss_duration = int(params['ss_duration'] * 0.5)
-        default_ds_duration = int(params['ds_duration'] * 0.5)
+        default_ss_duration = int(params['ss_duration'] * 0.4)
+        default_ds_duration = int(params['ds_duration'] * 0.4)
 
         unicycle_pos   = (initial_lfoot[3:5] + initial_rfoot[3:5]) / 2.
         unicycle_theta = (initial_lfoot[2]   + initial_rfoot[2]  ) / 2.
@@ -88,7 +88,7 @@ class FootstepPlanner:
         if self.plan[step_index]['ss_duration'] == 0: return 0
         return self.get_remaining_time_in_swing(time)/self.plan[step_index]['ss_duration']
          
-    def modify_plan(self, D_pos, D_ang, time, scaler = 0.9):
+    def modify_plan(self, D_pos, D_ang, time, scaler = 0.95):
         
         # start one index later to avoid shifting the plan on the foot currently on the ground
         starting_index = self.get_step_index_at_time(time) + 1

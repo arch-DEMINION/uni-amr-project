@@ -17,8 +17,8 @@ def main() -> None:
     vec_env = VecFrameStack(vec_env, n_stack=4)
     
     # for new wnvironment
-    vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=100.0, clip_reward=500)
-    model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.05, learning_rate=1e-3, n_epochs=2)
+    vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=False, clip_obs=100.0, clip_reward=500)
+    model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     
     # for loading 
     #vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)

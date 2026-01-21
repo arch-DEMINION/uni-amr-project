@@ -68,8 +68,8 @@ def main(train = False, load = False) -> None:
         s = env.reset()
 
         for _ in range(1500):
-            #action, _states = model.predict(s, deterministic=True)
-            action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
+            action, _states = model.predict(s, deterministic=True)
+            #action = np.array([[0.0, 0.01, 0.05]]) # send action just to make the robot going forward
             s, r, done, info = env.step(action)
 
             #if done: break
@@ -82,5 +82,5 @@ def main(train = False, load = False) -> None:
 
 if __name__ == "__main__":
 
-    main(train = False, load = True)
+    main(train = True, load = False)
     #SB3_test() # test for stable baseline 3
