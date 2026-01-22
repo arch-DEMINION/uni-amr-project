@@ -1,11 +1,1 @@
 Logging to ./multi.log
----------------------------------
-| rollout/           |          |
-|    ep_len_mean     | 23.4     |
-|    ep_rew_mean     | -19.4    |
-| time/              |          |
-|    fps             | 23       |
-|    iterations      | 1        |
-|    time_elapsed    | 21       |
-|    total_timesteps | 512      |
----------------------------------

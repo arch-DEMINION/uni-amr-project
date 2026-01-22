@@ -132,6 +132,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'checkpoint' : 'magenta'
   }
 
+  LEVELING_SYSTEM = {
+    'starting_level'   : 25,
+    'exp_to_new_level' : 3
+  }
+
   def __init__(self, 
                name        : str  = 'hrp4', 
                max_step    : int  = 1_000,
@@ -184,7 +189,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     colorama.init()
 
     self.end_of_plan_counter = 0
-    self.level = 20
+    self.level = self.LEVELING_SYSTEM['starting_level']
     self.episodes = 0
     self.init_gravity_ranges = (self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_y_range'])
     state , _ = self.reset(first_time_flag = True)
@@ -304,7 +309,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.episodes += 1
       if self.end_of_plan_condition(): 
         self.end_of_plan_counter += 1
-        if self.end_of_plan_counter % 3 == 0: 
+        if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0: 
           self.level += 1
           print(colored(f'NEW LWVEL: {self.level}', 'yellow'))
 
@@ -349,7 +354,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # restore the perturbations
     self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = pre_value
     
-    print("\nStarting episode: " + str(self.episodes) + f"| level: {self.level}" + "\n")
+    print("\nStarting episode: " + str(self.episodes) + f" | level: {self.level}" + "\n")
 
     if (self.episodes % self.frequency_change_of_grav) == 0:
       self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'], apply_gravity=False)
@@ -572,7 +577,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
-      print(colored("end of plan reached", 'yellow'))
+      print(colored(f"end of plan reached ({self.LEVELING_SYSTEM['exp_to_new_level'] if (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level']}/ {self.LEVELING_SYSTEM['exp_to_new_level']})", 'yellow'))
     # reward for checkpoints in the plan
     # hardcoded every 4th footstep, except the very first
     if step > 0 or self.end_of_plan_condition():
