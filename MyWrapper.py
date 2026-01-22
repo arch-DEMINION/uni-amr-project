@@ -550,7 +550,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # reward for end of plan
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
-      print(colored(f"end of plan reached ({self.LEVELING_SYSTEM['exp_to_new_level'] if (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level']}/ {self.LEVELING_SYSTEM['exp_to_new_level']})", 'yellow'))
+      print(colored(f"end of plan reached ({self.LEVELING_SYSTEM['exp_to_new_level'] if (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level']}/ {self.LEVELING_SYSTEM['exp_to_new_level']}) | level: {self.level}", 'yellow'))
     # reward for checkpoints in the plan
     # hardcoded every 3rd footstep, except the very first
     if step > 0 or self.end_of_plan_condition():
