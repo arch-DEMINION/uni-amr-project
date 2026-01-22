@@ -100,6 +100,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
+        'w_vel_ref':  1.5,
+     'sigma_vel_ref': 0.1,
+     
           'w_footstep' : 5.0,
       'sigma_footstep' : 0.15,
 'sigma_footstep_bonus' : 0.2,
@@ -142,7 +145,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
                verbose     : bool = False,
                mpc_frequency : int = 10,
                agent_frequency : int = 1,
-               frequency_change_grav : int = 1):
+               frequency_change_grav : int = 1,
+               max_scaler = 1.0,
+               min_scaler = 0.75):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -181,13 +186,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.episodes = 0
     self.frequency_change_of_grav = frequency_change_grav
     self.agent_frequency = agent_frequency
+    self.min_scaler = min_scaler
+    self.max_scaler = max_scaler
     
     colorama.init()
     state , _ = self.reset()
 
     # size of the observation and action spaces
     self.obs_size = len(state) # automatically take the length of the state
-    self.action_size = 3 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
+    self.action_size = 4 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
@@ -230,7 +237,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.node.customPreStep()
         self.world.step()
         self.current_MPC_step += 1
-        self.status = self.node.mpc.sol.stats()["return_status"]
+       # self.status = self.node.mpc.sol.stats()["return_status"]
         # render and plot updating
 
         self.status_solver = self.node.mpc.sol.stats()["return_status"]  
@@ -300,9 +307,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
     self.previous_states  = []
-    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
+    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'Scale':0, 'list' : np.array([0, 0, 0, 0])}]
     self.previous_rewards = []
-
+    
     self.angle_x = 0.0
     self.angle_y = 0.0
 
@@ -428,8 +435,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     oerr_pivot = (pivot.getTransform().rotation()@oerr)[0:3]
     support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
+    
+    ref_vel = pivot.getTransform().rotation()@self.node.footstep_planner.vref[step_index]
 
-    angle_ground = np.array([self.angle_x, self.angle_y])
     # compute the state as a np.array and as a dictionary
     state_dict = {
       'support_foot': support_foot,
@@ -450,7 +458,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'next_footstep_relpos': next_footstep_relpos,
       #'support_foot_next_relpos': support_foot_next_relpos,
       # 'previous_action': list(self.previous_actions[-1]['list'])
-      'angle_ground' : angle_ground
+      'ref_vel': ref_vel
     }
     state_array = np.concatenate(list(state_dict.values()))
 
@@ -470,11 +478,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The action as dictonary of float that can be used to perturbate the current footsteps
     :rtype: dict[str, float]
     '''
-    
+    print(action)
     # compute the current action as a dictionary
     action_dict = {'Dx'   : action[0],
                    'Dy'   : action[1],
                    'Dth'  : action[2],
+                   'Scaler': action[3],
                    'list' : action}
 
     # add the current action dict to the list of previous actions
@@ -500,13 +509,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     pos_displacement = np.array([action_dict['Dx'] * cos(z_support_footstep) - action_dict['Dy'] * sin(z_support_footstep),\
                                  action_dict['Dx'] * sin(z_support_footstep) + action_dict['Dy'] * cos(z_support_footstep), 0.0])
     ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
+    
+    scaler = num_to_range(action_dict['Scaler'], self.action_space.low[0], self.action_space.high[0], self.min_scaler, self.max_scaler)
 
     # scale if is in ss and time is running out
     if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss':
       pos_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
       ang_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     
-    self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
+    self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time, scaler)
     
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
     '''
@@ -543,9 +554,17 @@ class ISMPC2gym_env_wrapper(gym.Env):
     else:
       # double support phase
       current_reward += self.R_end(state, action)
+      
+    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
 
     # penalty for placing the foots to close
     r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
+    
+    # reward for CoM following desired velocities
+    com_vel = self.node.retrieve_state()['com']['vel']
+    current_reward += Ker(com_vel[0] - self.node.footstep_planner.vref[step][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    current_reward += Ker(com_vel[1] - self.node.footstep_planner.vref[step][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    
 
     # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
     r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
@@ -553,7 +572,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
                                  self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep + r_next_footstep_bonus
     
-    step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
       print(colored("end of plan reached", 'yellow'))

@@ -35,4 +35,4 @@ class NoBiasActionBiasACPolicy(ActorCriticPolicy):
         # now replace action_net with out own, no bias
         # from https://github.com/DLR-RM/stable-baselines3/blob/8fccf7f1c421deff6b54bd595c430604b24724b0/stable_baselines3/common/policies.py#L595
         # which leads to (self.action_dist.proba_distribution_net) https://github.com/DLR-RM/stable-baselines3/blob/8fccf7f1c421deff6b54bd595c430604b24724b0/stable_baselines3/common/distributions.py#L536C1-L536C66
-        self.action_net = nn.Linear(in_features=self.mlp_extractor.latent_dim_pi, out_features=3, bias=False)
+        self.action_net = nn.Linear(in_features=self.mlp_extractor.latent_dim_pi, out_features=4, bias=False)
