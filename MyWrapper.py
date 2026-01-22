@@ -16,6 +16,7 @@ import foot_trajectory_generator as ftg
 import random
 from logger import Logger
 import utils
+import math
 
 import simulation
 
@@ -566,6 +567,24 @@ class ISMPC2gym_env_wrapper(gym.Env):
         print(colored(f"reward for reaching step {step}", self.COLOR_CODE["checkpoint"]))
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
+
+    # penalty for joints exceeding limits
+    N = self.node.hrp4.getNumJoints()
+    Hrange = 0
+    for i in range(N):
+      j = self.node.hrp4.getJoint(i)
+      qM = j.getPositionUpperLimits()
+      qm = j.getPositionLowerLimits()
+      qi = j.getPositions()
+
+
+      if qM is not None and qm is not None and qi is not None and qM.size > 0 and qm.size > 0 and qi.size > 0:
+        if any(np.isinf(qM)) or any(np.isinf(qm)):
+          continue
+
+        Hrange += utils.sigmoid(qi, -5, 40., qm)+utils.sigmoid(qi, 5, 40., qM)
+    current_reward -= Hrange[0]
+
 
    # ismpc_state = self.node.retrieve_state()
 
