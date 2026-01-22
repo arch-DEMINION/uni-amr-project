@@ -269,7 +269,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     truncated = self.current_step > self.max_steps or self.end_of_plan_condition()    # truncate the termination because to long
 
     if terminated or truncated:
-        print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['reward']))
+        print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f}) | level: {self.level}", self.COLOR_CODE['reward']))
         #print(self.node.world.getGravity())
     # log and plot
     if self.show_plot:
@@ -304,7 +304,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.episodes += 1
       if self.end_of_plan_condition(): 
         self.end_of_plan_counter += 1
-        if self.end_of_plan_counter % 5 == 0: 
+        if self.end_of_plan_counter % 3 == 0: 
           self.level += 1
           print(colored(f'NEW LWVEL: {self.level}', 'yellow'))
 
@@ -349,7 +349,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # restore the perturbations
     self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = pre_value
     
-    print("\nStarting episode: " + str(self.episodes) + "\n")
+    print("\nStarting episode: " + str(self.episodes) + f"| level: {self.level}" + "\n")
 
     if (self.episodes % self.frequency_change_of_grav) == 0:
       self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'], apply_gravity=False)
