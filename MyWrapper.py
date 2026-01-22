@@ -117,11 +117,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 0.4, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 0.4,
-    'gravity_change_prob' : 1 * 0.01, # 1%
+    'gravity_x_range' : np.array([0.06, 0.12]) * 1, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 1,
+    'gravity_change_prob' : 0 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]) * 0.6,   # Newton
+    'force_range': np.array([50, 150]) * 0.3,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -178,12 +178,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.plot_rate   = plot_rate
     self.verbose     = verbose
     self.mpc_frequency = mpc_frequency
-    self.episodes = 0
     self.frequency_change_of_grav = frequency_change_grav
     self.agent_frequency = agent_frequency
     
     colorama.init()
-    state , _ = self.reset()
+
+    self.end_of_plan_counter = 0
+    self.level = 20
+    self.episodes = 0
+    self.init_gravity_ranges = (self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_y_range'])
+    state , _ = self.reset(first_time_flag = True)
 
     # size of the observation and action spaces
     self.obs_size = len(state) # automatically take the length of the state
@@ -280,7 +284,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
 
-  def reset(self, *, seed : int | None = None, options = None,) -> tuple[np.array, dict[str, any]]:
+  def reset(self, *, seed : int | None = None, options = None, first_time_flag = False) -> tuple[np.array, dict[str, any]]:
     '''
     Method for reset the simulation to the initial paramethers
     
@@ -294,6 +298,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # the first steps must be unperturbed for make the solver be able to do it
     pre_value = (self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'])
     self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = (0, 0)
+
+    # each time it reach the end 5 times increase the difficulty
+    if not first_time_flag:
+      self.episodes += 1
+      if self.end_of_plan_condition(): 
+        self.end_of_plan_counter += 1
+        if self.end_of_plan_counter % 5 == 0: 
+          self.level += 1
+          print(colored(f'NEW LWVEL: {self.level}', 'yellow'))
 
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_)
     self.is_plot_init = False
@@ -310,10 +323,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     state_array, state_dict = self.GetState()
     self.current_step = 0
     self.current_MPC_step = 0
-    self.episodes += 1
     
     self.footstep_checkpoint_given = False
     self.initial_foot_dist = np.linalg.norm(self.node.initial['lfoot']['pos'][:3] - self.node.initial['rfoot']['pos'][:3], ord=2)
+
+    self.PERTURBATION_PARAMETHERS['gravity_x_range'] = self.init_gravity_ranges[0]*self.level*0.01
+    self.PERTURBATION_PARAMETHERS['gravity_y_range'] = self.init_gravity_ranges[1]*self.level*0.01
 
     # advance in the world until the first foot starts moving
     # this is to avoid having the agent work before MPC starts working and the robot cannot move
@@ -330,14 +345,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.node.customPreStep()
       self.world.step()
       self.render()
+
+    # restore the perturbations
+    self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = pre_value
     
+    print("\nStarting episode: " + str(self.episodes) + "\n")
+
     if (self.episodes % self.frequency_change_of_grav) == 0:
       self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'], apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
-
-    # restore the perturbations
-    self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = pre_value 
-    print("\nStarting episode: " + str(self.episodes) + "\n")
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
