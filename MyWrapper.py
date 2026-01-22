@@ -443,7 +443,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'support_foot': support_foot,
       'remaining_time': np.array([remaining_time]),
       'com_pos':  ismpc_state['com']['pos'],
-      #'com_vel':  ismpc_state['com']['vel'],
+      'com_vel':  ismpc_state['com']['vel'],
       'zmp_pos':  ismpc_state['zmp']['pos'],
       #'zmp_vel':  ismpc_state['zmp']['vel'],
       #'torso_orient': ismpc_state['torso']['pos'],
@@ -478,7 +478,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The action as dictonary of float that can be used to perturbate the current footsteps
     :rtype: dict[str, float]
     '''
-    print(action)
+    
     # compute the current action as a dictionary
     action_dict = {'Dx'   : action[0],
                    'Dy'   : action[1],
@@ -561,9 +561,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
     
     # reward for CoM following desired velocities
-    com_vel = self.node.retrieve_state()['com']['vel']
-    current_reward += Ker(com_vel[0] - self.node.footstep_planner.vref[step][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
-    current_reward += Ker(com_vel[1] - self.node.footstep_planner.vref[step][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+  
+    current_reward += Ker(state["com_vel"][0] - state["ref_vel"][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    current_reward += Ker(state["com_vel"][1] - state["ref_vel"][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
     
 
     # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
