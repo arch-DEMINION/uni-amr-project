@@ -110,11 +110,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 0.3, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 0.3, # [3,4°, 6,8°] * scale
-    'gravity_change_prob' : 1 * 0.01, # 1%
+    'gravity_x_range' : np.array([0.06, 0.12]) * 1, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 1,
+    'gravity_change_prob' : 0 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]),   # Newton
+    'force_range': np.array([50, 150]) * 0.3,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -178,14 +178,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.plot_rate   = plot_rate
     self.verbose     = verbose
     self.mpc_frequency = mpc_frequency
-    self.episodes = 0
     self.frequency_change_of_grav = frequency_change_grav
     self.agent_frequency = agent_frequency
     self.footstep_scaler = footstep_scaler
     self.desired_trajectory = desired_trajectory
     
     colorama.init()
-    state , _ = self.reset()
+
+    self.end_of_plan_counter = 0
+    self.level = 20
+    self.episodes = 0
+    self.init_gravity_ranges = (self.PERTURBATION_PARAMETERS['gravity_x_range'], self.PERTURBATION_PARAMETERS['gravity_y_range'])
+    state , _ = self.reset(first_time_flag = True)
 
     # size of the observation and action spaces
     self.obs_size = len(state) # automatically take the length of the state
@@ -275,7 +279,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     info = {'state' : state_dict, 'reward' : reward, 'steps' : self.current_step, 'max_steps' : self.max_steps}
     return state_array, reward, terminated, truncated, info
 
-  def reset(self, *, seed : int | None = None, options = None,) -> tuple[np.array, dict[str, any]]:
+  def reset(self, *, seed : int | None = None, options = None, first_time_flag = False) -> tuple[np.array, dict[str, any]]:
     '''
     Method for reset the simulation to the initial paramethers
     
@@ -289,6 +293,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # the first steps must be unperturbed for make the solver be able to do it
     pre_value = (self.PERTURBATION_PARAMETERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETERS['gravity_change_prob'])
     self.PERTURBATION_PARAMETERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETERS['gravity_change_prob'] = (0, 0)
+
+    # each time it reach the end 5 times increase the difficulty
+    if not first_time_flag:
+      self.episodes += 1
+      if self.end_of_plan_condition(): 
+        self.end_of_plan_counter += 1
+        if self.end_of_plan_counter % 5 == 0: 
+          self.level += 1
+          print(colored(f'NEW LWVEL: {self.level}', 'yellow'))
 
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, trajectory=self.desired_trajectory)
     self.is_plot_init = False
@@ -305,7 +318,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     state_array, state_dict = self.GetState()
     self.current_step = 0
     self.current_MPC_step = 0
-    self.episodes += 1
     
     self.footstep_checkpoint_given = False
     self.initial_foot_dist = np.linalg.norm(self.node.initial['lfoot']['pos'][:3] - self.node.initial['rfoot']['pos'][:3], ord=2)
@@ -324,6 +336,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.node.customPreStep()
       self.world.step()
       self.render()
+
+    self.PERTURBATION_PARAMETERS['gravity_x_range'] = self.init_gravity_ranges[0]*self.level*0.01
+    self.PERTURBATION_PARAMETERS['gravity_y_range'] = self.init_gravity_ranges[1]*self.level*0.01
     
     # eventually change the gravity
     if (self.episodes % self.frequency_change_of_grav) == 0:
