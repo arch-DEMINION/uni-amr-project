@@ -126,6 +126,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   REWARD_LOWER_BOUND = -1500
+  LEVELING_SYSTEM = {
+    'starting_level'   : 25,
+    'exp_to_new_level' : 3
+  }
 
   def __init__(self, 
                name        : str  = 'hrp4', 
@@ -186,7 +190,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     colorama.init()
 
     self.end_of_plan_counter = 0
-    self.level = 20
+    self.level = self.LEVELING_SYSTEM['starting_level']
     self.episodes = 0
     self.init_gravity_ranges = (self.PERTURBATION_PARAMETERS['gravity_x_range'], self.PERTURBATION_PARAMETERS['gravity_y_range'])
     state , _ = self.reset(first_time_flag = True)
@@ -299,7 +303,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.episodes += 1
       if self.end_of_plan_condition(): 
         self.end_of_plan_counter += 1
-        if self.end_of_plan_counter % 3 == 0: 
+        if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0: 
           self.level += 1
           print(colored(f'NEW LWVEL: {self.level}', 'yellow'))
 
@@ -546,7 +550,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # reward for end of plan
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
-      print(colored("end of plan reached", 'yellow'))
+      print(colored(f"end of plan reached ({self.LEVELING_SYSTEM['exp_to_new_level'] if (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level']}/ {self.LEVELING_SYSTEM['exp_to_new_level']})", 'yellow'))
     # reward for checkpoints in the plan
     # hardcoded every 3rd footstep, except the very first
     if step > 0 or self.end_of_plan_condition():
