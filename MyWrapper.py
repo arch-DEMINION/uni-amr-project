@@ -299,7 +299,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.episodes += 1
       if self.end_of_plan_condition(): 
         self.end_of_plan_counter += 1
-        if self.end_of_plan_counter % 5 == 0: 
+        if self.end_of_plan_counter % 3 == 0: 
           self.level += 1
           print(colored(f'NEW LWVEL: {self.level}', 'yellow'))
 
