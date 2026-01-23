@@ -1,5 +1,6 @@
 import numpy as np
 from utils import *
+import copy
 
 class FootstepPlanner:
     def __init__(self, vref, initial_lfoot, initial_rfoot, params):
@@ -12,6 +13,7 @@ class FootstepPlanner:
         
         self.vref = vref
         self.plan = []
+        self.original_plan = []
 
         for j in range(len(vref)):
             # set step duration
@@ -59,6 +61,8 @@ class FootstepPlanner:
             
             # switch support foot
             support_foot = 'rfoot' if support_foot == 'lfoot' else 'lfoot'
+
+        self.original_plan = copy.deepcopy(self.plan)
 
     def get_step_index_at_time(self, time):
         t = 0
@@ -116,8 +120,8 @@ class FootstepPlanner:
             self.plan[i]['pos'] += D_pos
             self.plan[i]['ang'] += D_ang
             
-            D_pos *= scaler
-            D_ang *= scaler
+            # D_pos *= scaler
+            # D_ang *= scaler
 
     def get_current_footstep_from_plan(self, time : float) -> dict:
         '''

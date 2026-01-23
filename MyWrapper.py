@@ -101,8 +101,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
 
-        'w_vel_ref':  0.5,
-     'sigma_vel_ref': 0.4,
+        'w_vel_ref':  1.5,
+     'sigma_vel_ref': 0.1,
      
           'w_footstep' : 10.0,
       'sigma_footstep' : 0.15,
@@ -110,6 +110,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'distance_bonus' : 0.45,
 
     'terminated_penalty' : -50.0,
+    'desired_footstep_penalty': 10,
     'CoM_H_perc_safe' : 0.1,
 
     'action_weight_sw'  : 1.0,
@@ -121,11 +122,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 0.2, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 0.2,
-    'gravity_change_prob' : 1 * 0.01, # 1%
-    'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]) * 0.5,   # Newton
+    'gravity_x_range' : np.array([0.06, 0.12]) * 0., #2, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 0., #2,
+    'gravity_change_prob' : 0., # 1 * 0.01, # 1%
+    'ext_force_appl_prob': 0.,  #0.00333 * 3.0,  # 1%
+    'force_range': np.array([50, 150]) * 0., #5,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -380,6 +381,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # shorthands
     step_index = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     plan = self.node.footstep_planner.plan
+    original_plan = self.node.footstep_planner.original_plan
     # which foot is used for support (\sigma_k)
     support_foot_str = plan[step_index]['foot_id']
     # embedding
@@ -409,8 +411,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     support_foot_pos = ismpc_state[support_foot_str]['pos']
     support_foot_pos = np.array([support_foot_pos[i] for i in [3, 4, 2]])
 
-    # position of next footstep (taken by foot opposing the current support foot) relative to the current foot position
     support_foot_gpos = self.node.retrieve_state()[support_foot_str]['pos']
+
+    # position of next footstep (taken by foot opposing the current support foot) relative to the current foot position
     next_footstep_pos = plan[step_index + 1]['pos']
     next_footstep_ang = plan[step_index + 1]['ang'][2]
     # position of next footstep that will be taken by the current support foot relative to the current foot position
@@ -434,6 +437,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
 
     angle_ground = np.array([self.angle_x, self.angle_y])
+
+    perr = original_plan[step_index]['pos'] - support_foot_gpos[3:]
+    oerr = original_plan[step_index]['ang'] - support_foot_gpos[:3]
+    pdesired_pivot = (pivot.getTransform().matrix()@np.concatenate((perr, np.ones(1))))[0:3]
+    odesired_pivot = (pivot.getTransform().rotation()@oerr)[0:3]
+    desired_pivot = np.concatenate((pdesired_pivot, odesired_pivot))
+    desired_pivot = np.array([desired_pivot[i] for i in [0, 1, 5]])
     
     ref_vel = pivot.getTransform().rotation()@self.node.footstep_planner.vref[step_index]
 
@@ -447,7 +457,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       #'zmp_vel':  ismpc_state['zmp']['vel'],
       #'torso_orient': ismpc_state['torso']['pos'],
       # 'torso_angvel': ismpc_state['torso']['vel'],
-      'ref_vel': ref_vel,
+      #'ref_vel': ref_vel,
      # 'base_orient': ismpc_state['base']['pos'],
      # 'base_angvel': ismpc_state['base']['vel'],
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
@@ -456,6 +466,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       #'angular_momentum_drv': Ldot,
       # 'support_foot_pos': support_foot_pos,
       'next_footstep_relpos': next_footstep_relpos,
+      'desired_footstep_relpos': desired_pivot,
       #'support_foot_next_relpos': support_foot_next_relpos,
       # 'previous_action': list(self.previous_actions[-1]['list'])
       'angle_ground' : angle_ground
@@ -575,10 +586,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
 
-    # reward for CoM following desired velocities
-    com_vel = self.node.retrieve_state()['com']['vel']
-    current_reward += Ker(com_vel[0] - self.node.footstep_planner.vref[step][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
-    current_reward += Ker(com_vel[1] - self.node.footstep_planner.vref[step][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    # reward for CoM following desired velocities (in the same reference frame as the state)
+    # current_reward += Ker(state['com_vel'][0] - state['ref_vel'][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    # current_reward += Ker(state['com_vel'][1] - state['ref_vel'][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+
     
     # penalty for joints exceeding limits
     # N = self.node.hrp4.getNumJoints()
@@ -688,8 +699,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'][::2], action['list'][::2]) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
+                      
+    # penalty for placing the footsteps far away from the desired position in the original (unmodified) plan
+    footstep_penalty = -self.REWARD_FUNC_CONSTANTS['desired_footstep_penalty']*np.dot(state['desired_footstep_relpos'], state['desired_footstep_relpos'])
 
-    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty 
+
+    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + footstep_penalty
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
     '''
@@ -700,10 +715,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The reward for the end of the step
     :rtype: float
     '''
-
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
 
-    return action_penalty
+    return action_penalty 
   
   def ChangeGravity(self, range_x : list[float, float], range_y : list[float, float], additive : bool = False, apply_gravity = True) -> None:
     '''
