@@ -84,7 +84,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_rewards : list[ float            ]
 
   REWARD_FUNC_CONSTANTS = {
-          'r_alive' : 3.0,
+          'r_alive' : 5.0,
     
             'w_ZmP' : 0.3,
         'sigma_ZmP' : 0.1,
@@ -100,20 +100,20 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 5.0,
+          'w_footstep' : 50.0,
       'sigma_footstep' : 0.15,
 'sigma_footstep_bonus' : 0.2,
       'distance_bonus' : 0.45,
 
-    'terminated_penalty' : -100.0,
+    'terminated_penalty' : -1000.0,
     'CoM_H_perc_safe' : 0.1,
 
-    'action_weight_sw'  : 5.0,
-    'action_weight_ds'  : 5.0,
+    'action_weight_sw'  : 15.0,
+    'action_weight_ds'  : 15.0,
     'action_damping' : 0.001,
     'r_forward' : 10.0,
     'end_of_plan' : 100.0,
-    'footstep_checkpoint' : 2.0
+    'footstep_checkpoint' : 4.0
   }
 
   PERTURBATION_PARAMETHERS = {
@@ -133,8 +133,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   LEVELING_SYSTEM = {
-    'starting_level'   : 30,
-    'exp_to_new_level' : 3
+    'starting_level'   : 20,
+    'exp_to_new_level' : 6,
+    'exp_gain' : 2,
+    'exp_loss' : 1
   }
 
   def __init__(self, 
@@ -307,11 +309,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # each time it reach the end 5 times increase the difficulty
     if not first_time_flag:
       self.episodes += 1
-      if self.end_of_plan_condition(): 
-        self.end_of_plan_counter += 1
-        if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0: 
-          self.level += 1
-          print(colored(f'NEW LWVEL: {self.level}', 'yellow'))
+      #self.Leveling()
 
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_)
     self.is_plot_init = False
@@ -577,13 +575,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
-      print(colored(f"end of plan reached ({self.LEVELING_SYSTEM['exp_to_new_level'] if (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else (self.end_of_plan_counter+1)%self.LEVELING_SYSTEM['exp_to_new_level']}/ {self.LEVELING_SYSTEM['exp_to_new_level']}) | level: {self.level}", 'yellow'))
+      print(colored(f"end of plan reached ({self.LEVELING_SYSTEM['exp_to_new_level'] if   (self.end_of_plan_counter+self.LEVELING_SYSTEM['exp_gain'])%self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else (self.end_of_plan_counter+self.LEVELING_SYSTEM['exp_gain'])%self.LEVELING_SYSTEM['exp_to_new_level']} / {self.LEVELING_SYSTEM['exp_to_new_level']}) | level: {self.level}", 'yellow'))
+      self.Leveling()
+
     # reward for checkpoints in the plan
     # hardcoded every 4th footstep, except the very first
     if step > 0 or self.end_of_plan_condition():
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
-        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint'] * (step * 0.1)
+        current_reward += self.REWARD_FUNC_CONSTANTS['footstep_checkpoint'] * (step * 0.333 * 0.2)
         print(colored(f"reward for reaching step {step}", self.COLOR_CODE["checkpoint"]))
       elif step % 3 > 0:
         self.footstep_checkpoint_given = False
@@ -594,6 +594,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     #current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
     # penalty for y velocity
     #current_reward += -np.pow(ismpc_state['com']['vel'][1], 2) * self.REWARD_FUNC_CONSTANTS['r_forward']
+
+    if terminated: self.Leveling()
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
@@ -748,3 +750,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
   def end_of_plan_condition(self):
     return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
   
+  def Leveling(self) -> None:
+    if self.end_of_plan_condition(): 
+        self.end_of_plan_counter += self.LEVELING_SYSTEM['exp_gain']
+        if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0: 
+          self.level += 1
+          print(colored(f'NEW LWVEL: {self.level}', 'yellow')) 
+
+    else: self.end_of_plan_counter -= 0 if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else  self.LEVELING_SYSTEM['exp_loss']
