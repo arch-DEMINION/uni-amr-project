@@ -40,7 +40,7 @@ def main(train = True, load = False, filename_model=f"ppo_hrp4_multienv.zip", fi
         vec_env = VecNormalize.load("vec_normalized.pkl", vec_env)
         model = PPO.load("ppo_hrp4_multienv", vec_env)
     else:
-        vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=100.0, clip_reward=500)
+        vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=1000.0, clip_reward=50_000)
         model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     
     if train:
