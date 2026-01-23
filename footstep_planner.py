@@ -51,7 +51,7 @@ class FootstepPlanner:
                 'foot_id'    : support_foot,
                 'disp_pos'   : np.array([0.0, 0.0, 0.0]),
                 'disp_ang'   : np.array([0.0, 0.0, 0.0]),
-                'max_disp_pos'   : np.array([0.2, 0.2, 0.0]),
+                'max_disp_pos'   : np.array([0.15, 0.15, 0.0]),
                 'max_disp_ang'   : np.array([0.0, 0.0, np.pi/3])   
                 })
             

@@ -133,7 +133,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   LEVELING_SYSTEM = {
-    'starting_level'   : 20,
+    'starting_level'   : 23,
     'exp_to_new_level' : 6,
     'exp_gain' : 2,
     'exp_loss' : 1
