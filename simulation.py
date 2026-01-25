@@ -35,6 +35,9 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         }
         self.params['eta'] = np.sqrt(self.params['g'] / self.params['h'])
         self.last_control = -1000
+        self.ref_L = []
+        
+        
 
         # robot links
         self.lsole = hrp4.getBodyNode('l_sole')
@@ -84,10 +87,11 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         # initialize footstep planner
         #reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 5
         #reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 1
-        #reference = [(0.0, 0., 0.0)] * 20#  + [(0., 0., 0.)] * 100 
+       # reference = [(0.0, 0., 0.0)] * 20#  + [(0., 0., 0.)] * 100 
         #print(reference)
-        #reference = [(0.0, 0.1, 0.)] * 5 + [(0.1, 0.0, 0.)] * 5 + [(0.0, 0.1, 0.)] * 10
-        reference = [(0.1, 0.0, 0.)] * 20 
+      #  reference = [(0.0, 0.1, 0.)] * 5 + [(0.1, 0.0, 0.)] * 5 + [(0.0, 0.1, 0.)] * 10
+        reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10   # reference di scianca che funziona
+      #  reference = [(0.1, 0.0, 0.)] * 20
 
         self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
@@ -170,6 +174,15 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.desired['com']['acc'] = lip_state['com']['acc']
         self.desired['zmp']['pos'] = lip_state['zmp']['pos']
         self.desired['zmp']['vel'] = lip_state['zmp']['vel']
+        
+        plan = self.footstep_planner.plan
+        step_index = self.footstep_planner.get_step_index_at_time(self.time)
+        support_foot_str = plan[step_index]['foot_id']
+
+        pivot = self.lsole if support_foot_str== 'lfoot' else self.rsole
+        L_des = self.compute_angular_momentum(pivot.getTransform(pivot).translation())
+        self.ref_L.append(L_des)
+
 
         # get foot trajectories
         feet_trajectories = self.foot_trajectory_generator.generate_feet_trajectories_at_time(self.time)
@@ -338,7 +351,7 @@ def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0):
     world.addSkeleton(ground)
     
     # modified gravity
-    #world.setGravity([0, 1, -9.81])
+   # world.setGravity([0, 0, -9.81])
     g = 9.81
     gravity = [-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)]
     world.setGravity(gravity)
@@ -379,6 +392,7 @@ if __name__ == "__main__":
         viewer.run()
     except:
         pass
+    '''
     input()
     
     num_steps = 1000
@@ -387,12 +401,13 @@ if __name__ == "__main__":
         for step in range(num_steps):
             node.customPreStep()
             world.step()
-            # if step % 5 == 0: 
-            #     viewer.frame()
+            if step % 5 == 0: 
+                 viewer.frame()
     except:
         pass
 
     node.logger.update_plot(node.time)
     input()
-
+    
+'''
 

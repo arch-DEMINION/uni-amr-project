@@ -3,7 +3,7 @@ from utils import *
 
 class FootstepPlanner:
     def __init__(self, vref, initial_lfoot, initial_rfoot, params):
-        default_ss_duration = int(params['ss_duration'] * 0.5)
+        default_ss_duration = int(params['ss_duration'] * 1)
         default_ds_duration = int(params['ds_duration'] * 1)
 
         unicycle_pos   = (initial_lfoot[3:5] + initial_rfoot[3:5]) / 2.
