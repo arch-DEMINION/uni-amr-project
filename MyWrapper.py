@@ -110,7 +110,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'distance_bonus' : 0.45,
 
     'terminated_penalty' : -50.0,
-    'desired_footstep_penalty': 10,
+    'desired_footstep_penalty': 1,
     'CoM_H_perc_safe' : 0.1,
 
     'action_weight_sw'  : 1.0,
@@ -136,6 +136,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'reward'   : 'green',
     'checkpoint' : 'magenta'
   }
+
+  REWARD_LOWER_BOUND = -1500
 
   def __init__(self, 
                name        : str  = 'hrp4', 
@@ -331,7 +333,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
       return foot_pos[5] >= initial[5] + 1e-2
     
     # BYPASSED !!!!!
-    while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= 1 and False:
+    #while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= 1:
+    while not robot_moving ():
       self.node.customPreStep()
       self.world.step()
       self.render()
@@ -457,7 +460,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       #'zmp_vel':  ismpc_state['zmp']['vel'],
       #'torso_orient': ismpc_state['torso']['pos'],
       # 'torso_angvel': ismpc_state['torso']['vel'],
-      #'ref_vel': ref_vel,
+      'ref_vel': ref_vel,
      # 'base_orient': ismpc_state['base']['pos'],
      # 'base_angvel': ismpc_state['base']['vel'],
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
@@ -542,8 +545,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
     # compute the current reward
 
-    terminated_penalty = self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.status_solver == 'maximum iterations reached' else \
-                         self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.status_solver == 'solved inaccurate'          else 0
+    terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.status_solver == 'maximum iterations reached' else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.status_solver == 'solved inaccurate'          else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.status_solver == 'problem non convex'         else 0
     
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
@@ -573,11 +577,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     current_reward += r_next_footstep + r_next_footstep_bonus
     
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
+    # reward for end of plan
     if self.end_of_plan_condition():
       current_reward += self.REWARD_FUNC_CONSTANTS['end_of_plan']
       print(colored("end of plan reached", 'yellow'))
     # reward for checkpoints in the plan
-    # hardcoded every 4th footstep, except the very first
+    # hardcoded every 3rd footstep, except the very first
     if step > 0 or self.end_of_plan_condition():
       if step % 3 == 0 and not self.footstep_checkpoint_given:
         self.footstep_checkpoint_given = True
@@ -587,8 +592,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.footstep_checkpoint_given = False
 
     # reward for CoM following desired velocities (in the same reference frame as the state)
-    # current_reward += Ker(state['com_vel'][0] - state['ref_vel'][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
-    # current_reward += Ker(state['com_vel'][1] - state['ref_vel'][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    current_reward += Ker(state['com_vel'][0] - state['ref_vel'][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
+    current_reward += Ker(state['com_vel'][1] - state['ref_vel'][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
 
     
     # penalty for joints exceeding limits
@@ -615,6 +620,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     #current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
     # penalty for y velocity
     #current_reward += -np.pow(ismpc_state['com']['vel'][1], 2) * self.REWARD_FUNC_CONSTANTS['r_forward']
+
+    # clip max. negative reward for when ID solver crashes
+    current_reward = max(self.REWARD_LOWER_BOUND, current_reward)
 
     # add the current reward to the list of previous rewards
     self.previous_rewards.append(current_reward)
@@ -700,11 +708,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
                       
-    # penalty for placing the footsteps far away from the desired position in the original (unmodified) plan
-    footstep_penalty = -self.REWARD_FUNC_CONSTANTS['desired_footstep_penalty']*np.dot(state['desired_footstep_relpos'], state['desired_footstep_relpos'])
+    # bonus for placing the footsteps close to the desired position in the original (unmodified) plan
+    footstep_bonus = +self.REWARD_FUNC_CONSTANTS['desired_footstep_penalty']*np.dot(state['desired_footstep_relpos'], state['desired_footstep_relpos'])
 
 
-    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + footstep_penalty
+    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + footstep_bonus
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
     '''

@@ -4,8 +4,8 @@ import copy
 
 class FootstepPlanner:
     def __init__(self, vref, initial_lfoot, initial_rfoot, params):
-        default_ss_duration = int(params['ss_duration'] * 0.5)
-        default_ds_duration = int(params['ds_duration'] * 1)
+        default_ss_duration = int(params['ss_duration'])
+        default_ds_duration = int(params['ds_duration'])
 
         unicycle_pos   = (initial_lfoot[3:5] + initial_rfoot[3:5]) / 2.
         unicycle_theta = (initial_lfoot[2]   + initial_rfoot[2]  ) / 2.
@@ -120,8 +120,8 @@ class FootstepPlanner:
             self.plan[i]['pos'] += D_pos
             self.plan[i]['ang'] += D_ang
             
-            # D_pos *= scaler
-            # D_ang *= scaler
+            D_pos *= scaler
+            D_ang *= scaler
 
     def get_current_footstep_from_plan(self, time : float) -> dict:
         '''
