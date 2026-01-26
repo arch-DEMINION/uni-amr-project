@@ -681,10 +681,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
   
   def Leveling(self) -> None:
+    if not self.curriculum_learning:
+      return
+
     if self.end_of_plan_condition(): 
         self.end_of_plan_counter += self.LEVELING_SYSTEM['exp_gain']
-        if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0: 
+        if self.end_of_plan_counter >= self.LEVELING_SYSTEM['exp_to_new_level']:
           self.level += 1
-          print(colored(f'NEW LWVEL: {self.level}', 'yellow')) 
+          self.end_of_plan_counter = 0
+          
+          print(colored(f'NEW LEVEL: {self.level}', 'yellow')) 
 
-    else: self.end_of_plan_counter -= 0 if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0 else  self.LEVELING_SYSTEM['exp_loss']
+    else: self.end_of_plan_counter = max(0, self.end_of_plan_counter-self.LEVELING_SYSTEM['exp_loss'])
