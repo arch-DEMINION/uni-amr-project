@@ -11,10 +11,11 @@ import foot_trajectory_generator as ftg
 from logger import Logger
 import timeit
 from math import sin,cos
+import utils as utils
 
 
 class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
-    def __init__(self, world, hrp4):
+    def __init__(self, world, hrp4, trajectory=0):
         super(Hrp4Controller, self).__init__(world)
         self.world = world
         self.hrp4 = hrp4
@@ -29,7 +30,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             'world_time_step': world.getTimeStep(),
             'first_swing': 'rfoot',
             'µ': 0.5,
-            'N': 100,
+            'N': 250, # TO MODIFY N = 100
             'dof': self.hrp4.getNumDofs(),
         }
         self.params['eta'] = np.sqrt(self.params['g'] / self.params['h'])
@@ -81,10 +82,45 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.id = id.InverseDynamics(self.hrp4, redundant_dofs)
 
         # initialize footstep planner
-        reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 100 
-        # reference = [(0.0, 0., 0.0)] * 5  + [(0., 0., 0.)] * 100 
-        #print(reference)
-        #reference = [(0.1, 0., 0.)] * 5 + [(0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
+        # if trajectory is < 0 pick a random one, except validation ones
+        if trajectory < 0:
+            trajectory = random.randint(0, 7)
+
+        if trajectory == 100:
+            trajectory = random.randint(101, 103)
+
+        match trajectory:
+            case 0:
+                # on the spot
+                reference = [(0., 0., 0.)] * 10
+            case 1:
+                # forwards, then backwards
+                reference = [(0.1, 0., 0.)] * 25 + [(-0.1, 0., 0.)] * 25
+            case 2:
+                # backwards, then forwards
+                reference = [(-0.1, 0., 0.)] * 25 + [(0.1, 0., 0.)] * 25
+            case 3:
+                # turn on the spot
+                reference = [(0.0, 0., 0.12)] * 25
+            case 4:
+                # turn on the spot (other direction)
+                reference = [(0.0, 0., -0.12)] * 25
+            case 5:
+                # to the left, the to the right
+                reference = [(0.0, -0.1, 0.)] * 25 + [(0.0, 0.1, 0.)] * 25
+            case 6:
+                # to the right
+                reference = [(0.0, 0.1, 0.)] * 25 + [(0.0, -0.1, 0.)] * 25
+            # use the following for validation, hence
+            case 101:
+                # to the left, the to the right
+                reference = [(0.15, 0., 0.)] * 25 + [(0.0, 0.1, 0.)] * 25
+            case 102:
+                # to the right
+                reference = [(0.1, 0.1, 0.)] * 25
+            case 103:
+                # weird reference sine like
+                reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 10 
 
         self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
@@ -135,11 +171,6 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
     def customPreStep(self):
         # create current and desired states
         self.current = self.retrieve_state()
-
-        # for i in range(len(self.plan_skeleton)):
-        #     if i < self.footstep_planner.get_step_index_at_time(self.time):
-        #         self.plan_skeleton[i][4].setColor([0.0, 0.0, 1.0, 0.2])
-
 
         # update kalman filter
         u = np.array([self.desired['zmp']['vel'][0], self.desired['zmp']['vel'][1], self.desired['zmp']['vel'][2]])
@@ -235,10 +266,8 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             zmp[1] += (contact.point[1] * contact.force[2] / force[2] + (zmp[2] - contact.point[2]) * contact.force[1] / force[2])
 
         if force[2] <= 0.1: # threshold for when we lose contact
-            #print(f"lost contact at time {self.time}")
             zmp = np.array([0., 0., 0.]) # FIXME: this should return previous measurement
         else:
-            #print(f"contact at time {self.time}")
             # sometimes we get contact points that dont make sense, so we clip the ZMP close to the robot
             midpoint = (l_foot_position + l_foot_position) / 2.
             zmp[0] = np.clip(zmp[0], midpoint[0] - 0.3, midpoint[0] + 0.3)
@@ -324,7 +353,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             self.world.addSkeleton(step_skel)
             self.plan_skeleton.append(step_skel)
 
-def simulation_setup(render = True):
+def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0, trajectory=-1):
     world = dart.simulation.World()
 
     urdfParser = dart.utils.DartLoader()
@@ -333,7 +362,12 @@ def simulation_setup(render = True):
     ground = urdfParser.parseSkeleton(os.path.join(current_dir, "urdf", "ground.urdf"))
     world.addSkeleton(hrp4)
     world.addSkeleton(ground)
-    world.setGravity([0, 0, -9.81])
+    
+    # modified gravity
+    g = 9.81
+    gravity = [-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)]
+    world.setGravity(gravity)
+    
     world.setTimeStep(0.01)
 
     # set default inertia
@@ -343,7 +377,7 @@ def simulation_setup(render = True):
             body.setMass(1e-8)
             body.setInertia(default_inertia)
 
-    node = Hrp4Controller(world, hrp4)
+    node = Hrp4Controller(world, hrp4, trajectory=trajectory)
 
     if not render: return world, None, node
 
@@ -364,24 +398,27 @@ def simulation_setup(render = True):
 
 
 if __name__ == "__main__":
-    world, viewer, node = simulation_setup()
+    render = True
+    world, viewer, node = simulation_setup(render=render)
     node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
-    try: # ugly: catch footstep generation continuing beyond plan's end
-        viewer.run()
-    except:
-        pass
-    input()
-    
-    num_steps = 1000
 
-    try: # ugly: catch footstep generation continuing beyond plan's end
-        for step in range(num_steps):
-            node.customPreStep()
-            world.step()
-            # if step % 5 == 0: 
-            #     viewer.frame()
-    except:
-        pass
+    print(node.footstep_planner.plan)
+
+    if render:
+        try: # ugly: catch footstep generation continuing beyond plan's end
+            viewer.run()
+        except Exception as e:
+            print(e)
+    else:
+        num_steps = 10000
+        try: # ugly: catch footstep generation continuing beyond plan's end
+            for step in range(num_steps):
+                node.customPreStep()
+                world.step()
+                # if step % 5 == 0: 
+                #     viewer.frame()
+        except Exception as e:
+            print(e)
 
     node.logger.update_plot(node.time)
     input()

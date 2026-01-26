@@ -1,5 +1,6 @@
 import casadi as ca
 from scipy.spatial.transform import Rotation as R
+import dartpy as dart
 import numpy as np
 from numpy import sin,cos
 
@@ -132,3 +133,29 @@ def Ker(e : float, sigma_v : float, weight : float) -> float:
     '''
 
     return weight*np.exp( -np.pow(e/sigma_v + 1e-8, 2) )
+
+def num_to_range(num, inMin, inMax, outMin, outMax):
+  return outMin + (float(num - inMin) / float(inMax - inMin) * (outMax-outMin))
+
+def incline_floor(angle_x: float, angle_y : float):
+    
+    '''
+    Function to modify the gravity to make it behave as we are rotating the floor around axes x and y 
+    
+    :param angle_x: angle of rotation arounf x axis
+    :type angle_x: float
+    :param angle_y: angle of rotation arounf y axis
+    :type angle_y: float
+    :return: dart.simulation.World
+    '''   
+    world = dart.simulation.World()
+    g = -9.81
+    
+    world.setGravity([-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)])
+        
+    return world
+
+def decompose_gravity(angle_x, angle_y) -> list[float, float, float]:
+    g = 9.81
+    return [-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)]
+    

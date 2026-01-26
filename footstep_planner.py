@@ -1,15 +1,19 @@
 import numpy as np
 from utils import *
+import copy
 
 class FootstepPlanner:
     def __init__(self, vref, initial_lfoot, initial_rfoot, params):
-        default_ss_duration = params['ss_duration']
-        default_ds_duration = params['ds_duration']
+        default_ss_duration = int(params['ss_duration'])
+        default_ds_duration = int(params['ds_duration'])
 
         unicycle_pos   = (initial_lfoot[3:5] + initial_rfoot[3:5]) / 2.
         unicycle_theta = (initial_lfoot[2]   + initial_rfoot[2]  ) / 2.
         support_foot   = params['first_swing']
+        
+        self.vref = vref
         self.plan = []
+        self.original_plan = []
 
         for j in range(len(vref)):
             # set step duration
@@ -48,11 +52,17 @@ class FootstepPlanner:
                 'ang'        : ang,
                 'ss_duration': ss_duration,
                 'ds_duration': ds_duration,
-                'foot_id'    : support_foot
+                'foot_id'    : support_foot,
+                'disp_pos'   : np.array([0.0, 0.0, 0.0]),
+                'disp_ang'   : np.array([0.0, 0.0, 0.0]),
+                'max_disp_pos'   : np.array([0.2, 0.2, 0.0]),
+                'max_disp_ang'   : np.array([0.0, 0.0, np.pi/3])
                 })
             
             # switch support foot
             support_foot = 'rfoot' if support_foot == 'lfoot' else 'lfoot'
+
+        self.original_plan = copy.deepcopy(self.plan)
 
     def get_step_index_at_time(self, time):
         t = 0
@@ -88,15 +98,37 @@ class FootstepPlanner:
         if self.plan[step_index]['ss_duration'] == 0: return 0
         return self.get_remaining_time_in_swing(time)/self.plan[step_index]['ss_duration']
          
-    def modify_plan(self, D_pos, D_ang, time):
+    def modify_plan(self, D_pos, D_ang, time, scaler = 0.90):
+        '''
+        :param scaler: changes how future timesteps are scaled, belongs to [0,1].
+                        Where 0 means only the next footstep is displaced, 1 means the whole plan is shifted. (0, 1) means gradual scaling
+        :type scaler: float
+        '''
         
         # start one index later to avoid shifting the plan on the foot currently on the ground
         starting_index = self.get_step_index_at_time(time) + 1
 
-        # TODO: the RL agent should understand this
         if self.get_phase_at_time(time) == 'ds':
            starting_index += 1
+        
+        self.plan[starting_index]['disp_pos'] += D_pos
+        self.plan[starting_index]['disp_ang'] += D_ang
 
+        if np.abs(self.plan[starting_index]['disp_pos'][0]) >= self.plan[starting_index]['max_disp_pos'][0]: D_pos[0] = 0.0
+        if np.abs(self.plan[starting_index]['disp_pos'][1]) >= self.plan[starting_index]['max_disp_pos'][1]: D_pos[1] = 0.0
+        if np.abs(self.plan[starting_index]['disp_ang'][2]) >= self.plan[starting_index]['max_disp_ang'][2]: D_ang[2] = 0.0
+
+        if D_pos[0] == 0 and D_pos[1] == 0 and D_ang[2] == 0: return 
+        
         for i in range(starting_index, len(self.plan)):
-            self.plan[i]['pos'] += D_pos 
+            self.plan[i]['pos'] += D_pos
             self.plan[i]['ang'] += D_ang
+            
+            D_pos *= scaler
+            D_ang *= scaler
+
+    def get_current_footstep_from_plan(self, time : float) -> dict:
+        '''
+        Return the current footstep from the plan at time time
+        '''
+        return self.plan[self.get_step_index_at_time(time)]
