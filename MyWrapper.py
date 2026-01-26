@@ -146,7 +146,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                frequency_change_grav : int = 1,
                footstep_scaler: float = 0.9,
                action_space_bounds: float = 0.2,
-               desired_trajectory: int = -1):
+               desired_trajectory: int = -1,
+               curriculum_learning: bool = False):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -188,6 +189,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.agent_frequency = agent_frequency
     self.footstep_scaler = footstep_scaler
     self.desired_trajectory = desired_trajectory
+    self.curriculum_learning = curriculum_learning
     
     colorama.init()
 
