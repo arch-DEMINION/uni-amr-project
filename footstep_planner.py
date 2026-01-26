@@ -56,7 +56,7 @@ class FootstepPlanner:
                 'disp_pos'   : np.array([0.0, 0.0, 0.0]),
                 'disp_ang'   : np.array([0.0, 0.0, 0.0]),
                 'max_disp_pos'   : np.array([0.2, 0.2, 0.0]),
-                'max_disp_ang'   : np.array([0.0, 0.0, np.pi/3])   
+                'max_disp_ang'   : np.array([0.0, 0.0, np.pi/3])
                 })
             
             # switch support foot
@@ -99,11 +99,15 @@ class FootstepPlanner:
         return self.get_remaining_time_in_swing(time)/self.plan[step_index]['ss_duration']
          
     def modify_plan(self, D_pos, D_ang, time, scaler = 0.90):
+        '''
+        :param scaler: changes how future timesteps are scaled, belongs to [0,1].
+                        Where 0 means only the next footstep is displaced, 1 means the whole plan is shifted. (0, 1) means gradual scaling
+        :type scaler: float
+        '''
         
         # start one index later to avoid shifting the plan on the foot currently on the ground
         starting_index = self.get_step_index_at_time(time) + 1
 
-        # TODO: the RL agent should understand this
         if self.get_phase_at_time(time) == 'ds':
            starting_index += 1
         
@@ -115,7 +119,7 @@ class FootstepPlanner:
         if np.abs(self.plan[starting_index]['disp_ang'][2]) >= self.plan[starting_index]['max_disp_ang'][2]: D_ang[2] = 0.0
 
         if D_pos[0] == 0 and D_pos[1] == 0 and D_ang[2] == 0: return 
-
+        
         for i in range(starting_index, len(self.plan)):
             self.plan[i]['pos'] += D_pos
             self.plan[i]['ang'] += D_ang

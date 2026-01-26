@@ -8,33 +8,6 @@ from stable_baselines3.common.logger import configure
 import gymnasium as gym
 import numpy as np
 
-
-def SB3_test() -> None:
-    env = gym.make("InvertedPendulum-v5")
-
-    model = PPO("MlpPolicy", env, verbose=1)
-    model.learn(total_timesteps=1_000_000)
-
-    env_sim = gym.make("InvertedPendulum-v5", render_mode='human')
-    s,_ = env_sim.reset()
-    total_rew = 0
-    tranchs = 1
-
-    for i in range(1_000):
-        action, _states = model.predict(s, deterministic=True)
-        s, r, term, trunc, _ = env_sim.step(action)
-
-        if term or trunc: 
-            s, _ = env_sim.reset()
-            tranchs += 1
-
-        total_rew += r
-
-    env.close()
-    env_sim.close()
-    print(total_rew/tranchs)
-
-
 def main(train = False, load = False, custom_action = True) -> None:
     
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1)
@@ -46,13 +19,10 @@ def main(train = False, load = False, custom_action = True) -> None:
         model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     else:
         env = VecNormalize.load("vec_normalized.pkl", env)
-        model = PPO.load("ppo_hrp4_multienv", env)
-    
-    #new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
-    #model.set_logger(new_logger)
+        model = PPO.load("ppo_hrp4_multienv.zip", env)
 
     if train:
-        #print("start training")
+        print("start training")
         for _ in range(10):
             model.learn(total_timesteps=1024)  
             model.save('ppo_hrp4')
@@ -84,4 +54,3 @@ def main(train = False, load = False, custom_action = True) -> None:
 if __name__ == "__main__":
 
     main(train = False, load = True, custom_action = False)
-    #SB3_test() # test for stable baseline 3

@@ -86,20 +86,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
   REWARD_FUNC_CONSTANTS = {
           'r_alive' : 3.0,
-    
-            'w_ZmP' : 0.3,
-        'sigma_ZmP' : 0.1,
-        'w_ZmP_dot' : 0.003,
-    'sigma_ZmP_dot' : 0.1,
-    
-          'w_gamma' : 0.1,
-      'sigma_gamma' : 0.8,
-    
+      
              'w_ZH' : 0.1,
             'w_phi' : 0.1,
-
-         'w_smooth' : 0.1,
-     'sigma_smooth' : 0.1,
 
         'w_vel_ref':  1.5,
      'sigma_vel_ref': 0.1,
@@ -109,25 +98,23 @@ class ISMPC2gym_env_wrapper(gym.Env):
 'sigma_footstep_bonus' : 0.2,
       'distance_bonus' : 0.45,
 
-    'terminated_penalty' : -50.0,
+    'terminated_penalty' : -100.0,
     'sigma_desired_footstep': 0.1,
     'omega_desired_footstep': 2.5,
-    'CoM_H_perc_safe' : 0.1,
 
     'action_weight_sw'  : 1.0,
     'action_weight_ds'  : 1.0,
     'action_damping' : 0.001,
-    'r_forward' : 10.0,
     'end_of_plan' : 100.0,
     'footstep_checkpoint' : 3.0
   }
 
-  PERTURBATION_PARAMETHERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 0., #2, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 0., #2,
-    'gravity_change_prob' : 0., # 1 * 0.01, # 1%
-    'ext_force_appl_prob': 0.,  #0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]) * 0., #5,   # Newton
+  PERTURBATION_PARAMETERS = {
+    'gravity_x_range' : np.array([0.06, 0.12]) * 0.3, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 0.3, # [3,4°, 6,8°] * scale
+    'gravity_change_prob' : 1 * 0.01, # 1%
+    'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
+    'force_range': np.array([50, 150]),   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -150,7 +137,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
                verbose     : bool = False,
                mpc_frequency : int = 10,
                agent_frequency : int = 1,
-               frequency_change_grav : int = 1):
+               frequency_change_grav : int = 1,
+               footstep_scaler: float = 0.9,
+               action_space_bounds: float = 0.2,
+               desired_trajectory: int = -1):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -175,8 +165,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :param verbose: Set to true id want some text outputs 
     :type verbose: bool
 
-    :param 
+    :param footstep_scaler: Scaler parameter to use in modifying the footstep plan. 0 means only the next footstep is modified, 1 means the whole plan is displaced
+    :type footstep_scaler: float
     '''
+
     # init the name state and maximum steps for the simulations then reset the environment
     self.name        = name
     self.max_steps   = max_step
@@ -189,6 +181,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.episodes = 0
     self.frequency_change_of_grav = frequency_change_grav
     self.agent_frequency = agent_frequency
+    self.footstep_scaler = footstep_scaler
+    self.desired_trajectory = desired_trajectory
     
     colorama.init()
     state , _ = self.reset()
@@ -199,7 +193,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -0.02    , high = 0.02   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    self.action_space      = gym.spaces.Box(low = -action_space_bounds    , high = action_space_bounds   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -223,32 +217,25 @@ class ISMPC2gym_env_wrapper(gym.Env):
     action_dict = self.PreprocessAction(action)
 
     # get termination or truncation conditions
-    terminated = False                                # troncate because of unhelty conditions
+    # we consider the safe set to be whenever to termination conditions occur
+    terminated = False
     try:
       # take a step in to the environment
-      #if self.node.footstep_planner.get_step_index_at_time(self.node.time) >= 1: # start to modify after the 6 step of the robot
-
       starting_step = self.node.footstep_planner.get_step_index_at_time(self.node.time) # remember the starting step
       start_time = self.node.time
       self.ApplyAction(action_dict)
 
-      for i in range(self.mpc_frequency):
-      #while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= starting_step: # until is completed a step
-        
+      # simulate robot and environment using dartpy
+      for i in range(self.mpc_frequency):        
         self.node.customPreStep()
         self.world.step()
         self.current_MPC_step += 1
-        self.status = self.node.mpc.sol.stats()["return_status"]
-        # render and plot updating
-
-        self.status_solver = self.node.mpc.sol.stats()["return_status"]  
+        self.solver_status = self.node.mpc.sol.stats()["return_status"]  
         self.render()
-
-        #if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss' and self.node.time > start_time + self.node.footstep_planner.get_current_footstep_from_plan(self.node.time)['ss_duration'] * 1/self.agent_frequency: break
       
-      # apply the froces 
-      if np.random.random() < self.PERTURBATION_PARAMETHERS['ext_force_appl_prob']:
-        random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETHERS['force_range'], self.PERTURBATION_PARAMETHERS['CoM_offset_range'])
+      # apply the forces 
+      if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob']:
+        random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETERS['force_range'], self.PERTURBATION_PARAMETERS['CoM_offset_range'])
         random_body.addExtForce(random_force, random_point, True)
         #if self.verbose: print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
         print(colored(f"\nApplied force: {random_force} at body:  {random_body_name} \n", self.COLOR_CODE['forces']))
@@ -257,31 +244,31 @@ class ISMPC2gym_env_wrapper(gym.Env):
         
       
     except Exception as e:
-      #print(e)
-      self.status_solver = str(e).split("'")[-2]
-      print(colored(f"Failure during simulation: {self.status_solver}", self.COLOR_CODE['exception']))
+      self.solver_status = str(e).split("'")[-2]
+      print(colored(f"Failure during simulation: {self.solver_status}", self.COLOR_CODE['exception']))
       terminated = True
 
     # collect the state and the reward
     state_array, state_dict = self.GetState()
     reward = self.GetReward(state_dict, action_dict, terminated)
-    #print("Reward: "+ str(reward))
 
     # update the current step counter
     self.current_step += 1
 
-    truncated = self.current_step > self.max_steps or self.end_of_plan_condition()    # truncate the termination because to long
+    # truncate the episode after a set number of steps or when the plan has been completed
+    truncated = self.current_step > self.max_steps or self.end_of_plan_condition()
 
     if terminated or truncated:
         print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['reward']))
-        #print(self.node.world.getGravity())
+    
     # log and plot
     if self.show_plot:
       self.UpdatePlot()
 
-    # sometimes change the gravity a very bit (1/10 of the intended perturbation)
-    if np.random.random() < self.PERTURBATION_PARAMETHERS['gravity_change_prob']:
-      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETHERS['gravity_x_range']*0.1, additive = True, apply_gravity=False)
+    # sometimes change the gravity a tiny bit (1/10 of the intended perturbation)
+    # this simulates the robot being on an inclined plane
+    if np.random.random() < self.PERTURBATION_PARAMETERS['gravity_change_prob']:
+      self.ChangeGravity(self.PERTURBATION_PARAMETERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETERS['gravity_y_range']*0.1, additive = True, apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
       print(colored(f"gravity: (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['forces']))
 
@@ -300,10 +287,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # the first steps must be unperturbed for make the solver be able to do it
-    pre_value = (self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'])
-    self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = (0, 0)
+    pre_value = (self.PERTURBATION_PARAMETERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETERS['gravity_change_prob'])
+    self.PERTURBATION_PARAMETERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETERS['gravity_change_prob'] = (0, 0)
 
-    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_)
+    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, trajectory=self.desired_trajectory)
     self.is_plot_init = False
 
     # reset the lists that store the previous states and actions usefool for computing the rewards
@@ -325,7 +312,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # advance in the world until the first foot starts moving
     # this is to avoid having the agent work before MPC starts working and the robot cannot move
-        
     def robot_moving() -> bool:
       foot = self.node.footstep_planner.plan[0]['foot_id']
       state = self.node.retrieve_state()
@@ -333,24 +319,24 @@ class ISMPC2gym_env_wrapper(gym.Env):
       foot_pos = state[foot]['pos']
       return foot_pos[5] >= initial[5] + 1e-2
     
-    # BYPASSED !!!!!
-    #while self.node.footstep_planner.get_step_index_at_time(self.node.time) <= 1:
-    while not robot_moving ():
+    # TODO: check if this has any impact with changing gravity
+    while not robot_moving():
       self.node.customPreStep()
       self.world.step()
       self.render()
     
+    # eventually change the gravity
     if (self.episodes % self.frequency_change_of_grav) == 0:
-      self.ChangeGravity(self.PERTURBATION_PARAMETHERS['gravity_x_range'], self.PERTURBATION_PARAMETHERS['gravity_x_range'], apply_gravity=False)
+      self.ChangeGravity(self.PERTURBATION_PARAMETERS['gravity_x_range'], self.PERTURBATION_PARAMETERS['gravity_x_range'], apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
 
     # restore the perturbations
-    self.PERTURBATION_PARAMETHERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETHERS['gravity_change_prob'] = pre_value 
+    self.PERTURBATION_PARAMETERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETERS['gravity_change_prob'] = pre_value 
     print("\nStarting episode: " + str(self.episodes) + "\n")
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
-    if self.verbose: print("env resetted")
+    if self.verbose: print("environment reset")
 
     return state_array, info
 
@@ -369,7 +355,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     print('Environment closed, to be implemented')
 
 # UTILS METHODS FOR EXTRACTING INFORMATION FROM THE ENVIRONEMNT AND PROCESS DATA
-
   def GetState(self) -> tuple[np.array, dict[str, any]]:
     '''
     Function for computing the current state of the system both as a np.array for the policy neural network and 
@@ -391,7 +376,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # embedding
     support_foot = np.array([1., 0.]) if support_foot_str == 'rfoot' else np.array([0.,1.])
 
-    # IMPORTANT BUGFIX used support_foot instead support_foot_str
     pivot = self.node.lsole if support_foot_str == 'lfoot' else self.node.rsole
 
     # remaining time in swing (\T_r_k)
@@ -406,10 +390,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # # angular momentum about support pivot
     L = self.node.compute_angular_momentum(pivot.getTransform(pivot).translation())
-    # derivatives of angular momentum
-    Ldot_x = -mass*g*com_pos[1]
-    Ldot_y = mass*g*com_pos[0]
-    Ldot = np.array([Ldot_x, Ldot_y])
 
     # pose of support foot as [x,y,theta], relative to support foot
     support_foot_pos = ismpc_state[support_foot_str]['pos']
@@ -420,27 +400,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # position of next footstep (taken by foot opposing the current support foot) relative to the current foot position
     next_footstep_pos = plan[step_index + 1]['pos']
     next_footstep_ang = plan[step_index + 1]['ang'][2]
-    # position of next footstep that will be taken by the current support foot relative to the current foot position
-    # (second footstep from now)
-    support_foot_next_pos = plan[step_index + 2]['pos']
-    support_foot_next_ang = plan[step_index+2]['ang']
     # move them in the coordinate frame of the pivot + take only [x, y, theta]
-
     perr = next_footstep_pos - support_foot_gpos[3:]
     oerr = next_footstep_pos - support_foot_gpos[:3]
     perr_pivot = (pivot.getTransform().matrix()@np.concatenate((perr, np.ones(1))))[0:3]
     oerr_pivot = pivot.getTransform().rotation()@oerr[0:3]
     next_footstep_relpos = np.concatenate((perr_pivot, oerr_pivot))
     next_footstep_relpos = np.array([next_footstep_relpos[i] for i in [0,1,5]])  # x, y, gamma 
-
-    perr = support_foot_next_pos - support_foot_gpos[3:]
-    oerr = support_foot_next_ang - support_foot_gpos[:3]
-    perr_pivot = (pivot.getTransform().matrix()@np.concatenate((perr, np.ones(1))))[0:3]
-    oerr_pivot = (pivot.getTransform().rotation()@oerr)[0:3]
-    support_foot_next_relpos = np.concatenate((perr_pivot, oerr_pivot))
-    support_foot_next_relpos = np.array([support_foot_next_relpos[i] for i in [0,1,5]])
-
-    angle_ground = np.array([self.angle_x, self.angle_y])
 
     perr = original_plan[step_index]['pos'] - support_foot_gpos[3:]
     oerr = original_plan[step_index]['ang'] - support_foot_gpos[:3]
@@ -458,22 +424,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
       'com_pos':  ismpc_state['com']['pos'],
       'com_vel':  ismpc_state['com']['vel'],
       'zmp_pos':  ismpc_state['zmp']['pos'],
-      #'zmp_vel':  ismpc_state['zmp']['vel'],
-      #'torso_orient': ismpc_state['torso']['pos'],
-      # 'torso_angvel': ismpc_state['torso']['vel'],
       'ref_vel': ref_vel,
-     # 'base_orient': ismpc_state['base']['pos'],
-     # 'base_angvel': ismpc_state['base']['vel'],
       'zmp_pos_desired': self.node.desired['zmp']['pos'],
-     # 'zmp_vel_desired': self.node.desired['zmp']['vel'],
       'angular_momentum': L,
-      #'angular_momentum_drv': Ldot,
-      # 'support_foot_pos': support_foot_pos,
       'next_footstep_relpos': next_footstep_relpos,
       'desired_footstep_relpos': desired_pivot,
-      #'support_foot_next_relpos': support_foot_next_relpos,
-      # 'previous_action': list(self.previous_actions[-1]['list'])
-      'angle_ground' : angle_ground
     }
     state_array = np.concatenate(list(state_dict.values()))
 
@@ -529,7 +484,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       pos_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
       ang_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     
-    self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time)
+    self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time, scaler=self.footstep_scaler)
     
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
     '''
@@ -544,11 +499,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: Description
     :rtype: float
     '''
-    # compute the current reward
 
-    terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.status_solver == 'maximum iterations reached' else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.status_solver == 'solved inaccurate'          else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.status_solver == 'problem non convex'         else 0
+    # termination penalty and alive bonus
+    terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.solver_status == 'maximum iterations reached' else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.solver_status == 'solved inaccurate'          else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.solver_status == 'problem non convex'         else 0
     
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
@@ -559,24 +514,19 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.previous_rewards.append(current_reward)
       return current_reward
 
-    # TODO: safe set?
+    # change reward depending on gait phase
+    current_reward += self.R_sw(state, action) if state['remaining_time'] > 0 else self.R_end(state, action)
 
-    if state['remaining_time'] > 0:
-      # swing phase
-      current_reward += self.R_sw(state, action)
-    else:
-      # double support phase
-      current_reward += self.R_end(state, action)
-
+    # try to keep the feet at a proper distance to avoid self collisions
     # penalty for placing the foots to close
     r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
-
     # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
     r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
                                  self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
                                  self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep + r_next_footstep_bonus
     
+    # checkpoint bonus
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     # reward for end of plan
     if self.end_of_plan_condition():
@@ -595,32 +545,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # reward for CoM following desired velocities (in the same reference frame as the state)
     current_reward += Ker(state['com_vel'][0] - state['ref_vel'][0],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
     current_reward += Ker(state['com_vel'][1] - state['ref_vel'][1],  self.REWARD_FUNC_CONSTANTS['sigma_vel_ref'], self.REWARD_FUNC_CONSTANTS['w_vel_ref'])
-
-    
-    # penalty for joints exceeding limits
-    # N = self.node.hrp4.getNumJoints()
-    # Hrange = 0
-    # for i in range(N):
-    #   j = self.node.hrp4.getJoint(i)
-    #   qM = j.getPositionUpperLimits()
-    #   qm = j.getPositionLowerLimits()
-    #   qi = j.getPositions()
-
-
-    #   if qM is not None and qm is not None and qi is not None and qM.size > 0 and qm.size > 0 and qi.size > 0:
-    #     if any(np.isinf(qM)) or any(np.isinf(qm)):
-    #       continue
-
-    #     Hrange += utils.sigmoid(qi, -5, 40., qm)+utils.sigmoid(qi, 5, 40., qM)
-    # current_reward -= Hrange[0]
-
-
-   # ismpc_state = self.node.retrieve_state()
-
-    # forward bonus
-    #current_reward += ismpc_state['com']['vel'][0] * self.REWARD_FUNC_CONSTANTS['r_forward']
-    # penalty for y velocity
-    #current_reward += -np.pow(ismpc_state['com']['vel'][1], 2) * self.REWARD_FUNC_CONSTANTS['r_forward']
 
     # clip max. negative reward for when ID solver crashes
     current_reward = max(self.REWARD_LOWER_BOUND, current_reward)
@@ -641,39 +565,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
   def InitPlot(self) -> None:
     self.node.logger.initialize_plot(frequency=10)
     self.is_plot_init = True
-      
-  def Is_in_Safe_Set(self, state : dict[str, any]) -> bool:
-    
-    '''
-    Method that check if the current state is in the safe set S
-
-    :param state: The current state as a dictionary containing all the interesting therms indicized using strings
-    :type state: dict[str, any]
-    :return: True if the state is in the safe set, False otherwise
-    :rtype: bool
-    '''
-    safe_CoM = False
-    safe_ZmP = False
-    
-    # CoM constraints
-    Com_Lb = (self.node.mpc.h - self.node.mpc.h * self.REWARD_FUNC_CONSTANTS['CoM_H_perc_safe'])
-    Com_Up = (self.node.mpc.h + self.node.mpc.h * self.REWARD_FUNC_CONSTANTS['CoM_H_perc_safe'])
-
-    safe_CoM = state['com_pos'][2] >= Com_Lb and state['com_pos'][2] < Com_Up
-
-    # zmp constraints    
-    safe_ZmP_x = (state['zmp_pos'][0] <= state['support_foot_pos'][0] + self.node.params['foot_size'] / 2.) and \
-                 (state['zmp_pos'][0] >= state['support_foot_pos'][0] - self.node.params['foot_size'] / 2.) 
-    safe_ZmP_y = (state['zmp_pos'][1] <= state['support_foot_pos'][1] + self.node.params['foot_size'] / 2.) and \
-                 (state['zmp_pos'][1] >= state['support_foot_pos'][1] - self.node.params['foot_size'] / 2.)
-    safe_ZmP_z = True
-    safe_ZmP = safe_ZmP_x and safe_ZmP_y and safe_ZmP_z
-               
-    safe = safe_CoM and safe_ZmP
-    # if not safe:
-    #   print(f"com safe: {safe_CoM}, zmp safe: {safe_ZmP_x},{safe_ZmP_y},{safe_ZmP_z}")
-    
-    return safe
   
   def R_sw(self, state : dict[str, any],action : dict[str, float]) -> float:
     '''
@@ -685,35 +576,20 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :rtype: float
     '''
     
-    # remember state is relative and in coordinates of the support foot
-    r_ZmP_x = 0 #Ker(state['zmp_pos'][0] - state['zmp_pos_desired'][0], self.REWARD_FUNC_CONSTANTS['sigma_ZmP'], self.REWARD_FUNC_CONSTANTS['w_ZmP'])
-    r_ZmP_y = 0 #Ker(state['zmp_pos'][1] - state['zmp_pos_desired'][1], self.REWARD_FUNC_CONSTANTS['sigma_ZmP'], self.REWARD_FUNC_CONSTANTS['w_ZmP'])
-    r_ZmP_z = 0 #Ker(state['zmp_pos'][2] - state['zmp_pos_desired'][2], self.REWARD_FUNC_CONSTANTS['sigma_ZmP'], self.REWARD_FUNC_CONSTANTS['w_ZmP'])
-
-    # do we actually want to tell the agent this ? 
-    r_ZmP_dot_x = 0 #Ker(state['zmp_vel'][0] - state['zmp_vel_desired'][0], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
-    r_ZmP_dot_y = 0 #Ker(state['zmp_vel'][1] - state['zmp_vel_desired'][1], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
-    r_ZmP_dot_z = 0 #Ker(state['zmp_vel'][2] - state['zmp_vel_desired'][2], self.REWARD_FUNC_CONSTANTS['sigma_ZmP_dot'], self.REWARD_FUNC_CONSTANTS['w_ZmP_dot'])
-    
-    r_gamma = 0 #Ker(state['torso_orient'][2], self.REWARD_FUNC_CONSTANTS['sigma_gamma'],self.REWARD_FUNC_CONSTANTS['w_gamma'])
-    
     # com_pos and self.node.mpc.h are in the same coordinate systems
     com_pos = self.node.retrieve_state()['com']['pos']
     r_ZH  = - self.REWARD_FUNC_CONSTANTS['w_ZH'] * np.abs(com_pos[2] - self.node.mpc.h)
-    r_phi = 0 #- self.REWARD_FUNC_CONSTANTS['w_phi'] * np.linalg.norm(state['torso_orient'][0:1], ord=2)
+    # TODO: add rewards/penalties on torso
 
-    r_ZmP = r_ZmP_x + r_ZmP_y + r_ZmP_z
-    r_ZmP_dot = r_ZmP_dot_x + r_ZmP_dot_y + r_ZmP_dot_z
-    
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'][::2], action['list'][::2]) / \
+    # penalty for large displacements near the end of the swing phase
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_sw']*np.dot(action['list'][::2], action['list'][::2]) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
                       
     # bonus for placing the footsteps close to the desired position in the original (unmodified) plan
     footstep_bonus = +Ker(np.dot(state['desired_footstep_relpos'], state['desired_footstep_relpos']), self.REWARD_FUNC_CONSTANTS['sigma_desired_footstep'], self.REWARD_FUNC_CONSTANTS['omega_desired_footstep']) 
 
-
-    return r_ZmP + r_ZmP_dot + r_gamma + r_ZH + r_phi + action_penalty + footstep_bonus
+    return r_ZH + action_penalty + footstep_bonus
   
   def R_end(self, state : dict[str, any], action : dict[str, float]) -> float:
     '''
@@ -724,6 +600,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The reward for the end of the step
     :rtype: float
     '''
+
+    # penalize large actions when in double support
     action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
 
     return action_penalty 
