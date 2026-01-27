@@ -11,15 +11,17 @@ import foot_trajectory_generator as ftg
 from logger import Logger
 import timeit
 from math import sin,cos
+import random
 import utils as utils
 
 
 class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
-    def __init__(self, world, hrp4, trajectory=0):
+    def __init__(self, world, hrp4, trajectory=0, get_ref = False):
         super(Hrp4Controller, self).__init__(world)
         self.world = world
         self.hrp4 = hrp4
         self.time = 0
+        self.get_ref = get_ref
         self.params = {
             'g': 9.81,
             'h': 0.72,
@@ -30,11 +32,12 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             'world_time_step': world.getTimeStep(),
             'first_swing': 'rfoot',
             'µ': 0.5,
-            'N': 250, # TO MODIFY N = 100
+            'N': 120, # TO MODIFY originally 250
             'dof': self.hrp4.getNumDofs(),
         }
         self.params['eta'] = np.sqrt(self.params['g'] / self.params['h'])
         self.last_control = -1000
+        self.ref_L = []
 
         # robot links
         self.lsole = hrp4.getBodyNode('l_sole')
@@ -88,6 +91,9 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         if trajectory == 100:
             trajectory = random.randint(101, 103)
+            
+        if self.get_ref:
+            trajectory = 103  # to get always the same reference when getting L_des
 
         match trajectory:
             case 0:
@@ -120,7 +126,8 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                 reference = [(0.1, 0.1, 0.)] * 25
             case 103:
                 # weird reference sine like
-                reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 10 
+                reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10 # + [(0., 0., 0.)] * 10 
+               # reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10   # reference di scianca che funziona
 
         self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
@@ -199,6 +206,17 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.desired['zmp']['pos'] = lip_state['zmp']['pos']
         self.desired['zmp']['vel'] = lip_state['zmp']['vel']
 
+        if self.get_ref:
+            # compute desired angular momentum about the support foot
+            plan = self.footstep_planner.plan
+            step_index = self.footstep_planner.get_step_index_at_time(self.time)
+            support_foot_str = plan[step_index]['foot_id']
+
+            pivot = self.lsole if support_foot_str== 'lfoot' else self.rsole
+            L_des = self.compute_angular_momentum(pivot.getTransform(pivot).translation())
+            self.ref_L.append(L_des)
+        
+        
         # get foot trajectories
         feet_trajectories = self.foot_trajectory_generator.generate_feet_trajectories_at_time(self.time)
         for foot in ['lfoot', 'rfoot']:
@@ -352,8 +370,12 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             
             self.world.addSkeleton(step_skel)
             self.plan_skeleton.append(step_skel)
+            
+    def set_get_ref_node(self, value: bool):
+        self.get_ref = value
+        return
 
-def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0, trajectory=-1):
+def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0, trajectory=-1, get_reference = False):
     world = dart.simulation.World()
 
     urdfParser = dart.utils.DartLoader()
@@ -377,7 +399,7 @@ def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0, trajectory=-1)
             body.setMass(1e-8)
             body.setInertia(default_inertia)
 
-    node = Hrp4Controller(world, hrp4, trajectory=trajectory)
+    node = Hrp4Controller(world, hrp4, trajectory=trajectory, get_ref = get_reference)
 
     if not render: return world, None, node
 

@@ -90,23 +90,27 @@ class ISMPC2gym_env_wrapper(gym.Env):
              'w_ZH' : 0.1,
             'w_phi' : 0.1,
 
-        'w_vel_ref':  1.5,
+        'w_vel_ref':  0,  # originally 1.5
      'sigma_vel_ref': 0.1,
      
-          'w_footstep' : 10.0,
+         
+          'w_L' : 3.5,
+          'sigma_L': 0.05,
+     
+          'w_footstep' : 0.8,  # originally 10.0
       'sigma_footstep' : 0.15,
 'sigma_footstep_bonus' : 0.2,
-      'distance_bonus' : 0.45,
+      'distance_bonus' : 0.35,   # originally 0.45
 
-    'terminated_penalty' : -100.0,
-    'sigma_desired_footstep': 0.1,
-    'omega_desired_footstep': 2.5,
+    'terminated_penalty' : -1000.0,
+    'sigma_desired_footstep': 0.1, 
+    'omega_desired_footstep': 0,  #originally 2.5
 
-    'action_weight_sw'  : 1.0,
-    'action_weight_ds'  : 1.0,
+    'action_weight_sw'  : 4.0,  # originally 1.0
+    'action_weight_ds'  : 4.0,  # originally 1.0
     'action_damping' : 0.001,
-    'end_of_plan' : 100.0,
-    'footstep_checkpoint' : 3.0
+    'end_of_plan' : 1000.0,  # originally 100.0
+    'footstep_checkpoint' : 5.0  #originally 3.0
   }
 
   PERTURBATION_PARAMETERS = {
@@ -145,9 +149,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
                agent_frequency : int = 1,
                frequency_change_grav : int = 1,
                footstep_scaler: float = 0.9,
-               action_space_bounds: float = 0.2,
+               action_space_bounds: float = 0.02, # originally 0.2
                desired_trajectory: int = -1,
-               curriculum_learning: bool = False):
+               curriculum_learning: bool = False,
+               grav_bool : float= 1.0,
+               force_bool : float =1.0,
+               get_L_reference : bool = False,
+               get_ref_node :bool= False):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -190,6 +198,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.footstep_scaler = footstep_scaler
     self.desired_trajectory = desired_trajectory
     self.curriculum_learning = curriculum_learning
+    self.get_L_reference = get_L_reference
+    self.get_ref_node = get_ref_node
+    self.grav_bool = grav_bool
+    self.force_bool = force_bool
+    self.L_des = []
     
     colorama.init()
 
@@ -246,7 +259,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.render()
       
       # apply the forces 
-      if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob']:
+      if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob'] * self.force_bool:
         random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETERS['force_range'], self.PERTURBATION_PARAMETERS['CoM_offset_range'])
         random_body.addExtForce(random_force, random_point, True)
         #if self.verbose: print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
@@ -262,7 +275,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # collect the state and the reward
     state_array, state_dict = self.GetState()
-    reward = self.GetReward(state_dict, action_dict, terminated)
+    
+    reward = 0.0
+
+    if not self.get_L_reference:
+      reward = self.GetReward(state_dict, action_dict, terminated)
+  
+    if self.get_L_reference:
+      
+        self.get_Ldes(self.node.ref_L[-1]) # appending only the last L_des of the 10 MPC cycles computed in step                                                                     # i.e. the one that will be compared with L computed in Get_state()
+        self.node.ref_L = []
 
     # update the current step counter
     self.current_step += 1
@@ -279,7 +301,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # sometimes change the gravity a tiny bit (1/10 of the intended perturbation)
     # this simulates the robot being on an inclined plane
-    if np.random.random() < self.PERTURBATION_PARAMETERS['gravity_change_prob']:
+    if np.random.random() < self.PERTURBATION_PARAMETERS['gravity_change_prob'] * self.grav_bool:
       self.ChangeGravity(self.PERTURBATION_PARAMETERS['gravity_x_range']*0.1, self.PERTURBATION_PARAMETERS['gravity_y_range']*0.1, additive = True, apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
       print(colored(f"gravity: (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['forces']))
@@ -307,10 +329,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.episodes += 1
       #self.Leveling()
 
-    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, trajectory=self.desired_trajectory)
+    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, trajectory=self.desired_trajectory, get_reference=self.get_ref_node)
+
     self.is_plot_init = False
 
-    # reset the lists that store the previous states and actions usefool for computing the rewards
+    # reset the lists that store the previous states and actions useful for computing the rewards
     self.previous_states  = []
     self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
     self.previous_rewards = []
@@ -345,7 +368,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.PERTURBATION_PARAMETERS['gravity_y_range'] = self.init_gravity_ranges[1]*self.level*0.01
     
     # eventually change the gravity
-    if (self.episodes % self.frequency_change_of_grav) == 0:
+    if (self.episodes % self.frequency_change_of_grav) == 0 and self.grav_bool > 0.0:
       self.ChangeGravity(self.PERTURBATION_PARAMETERS['gravity_x_range'], self.PERTURBATION_PARAMETERS['gravity_x_range'], apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
 
@@ -545,6 +568,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
                                  self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep + r_next_footstep_bonus
     
+    # reward for angular momentum tracking
+    if len(self.L_des) != 0:
+      
+      r_angular_momentum_x = Ker(self.L_des[self.current_step][0]- state['angular_momentum'][0], self.REWARD_FUNC_CONSTANTS['sigma_L'], self.REWARD_FUNC_CONSTANTS['w_L'])
+      r_angular_momentum_y = Ker(self.L_des[self.current_step][1]- state['angular_momentum'][1], self.REWARD_FUNC_CONSTANTS['sigma_L'], self.REWARD_FUNC_CONSTANTS['w_L'])
+      current_reward += r_angular_momentum_x + r_angular_momentum_y
+    
     # checkpoint bonus
     step = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     # reward for end of plan
@@ -695,3 +725,44 @@ class ISMPC2gym_env_wrapper(gym.Env):
           print(colored(f'NEW LEVEL: {self.level}', 'yellow')) 
 
     else: self.end_of_plan_counter = max(0, self.end_of_plan_counter-self.LEVELING_SYSTEM['exp_loss'])
+    
+  def set_disturbances(self, grav_bool: float, force_bool: float) -> None:
+    '''
+    Utility function for setting the disturbances flags
+
+    :param grav_bool: Flag for enabling gravity disturbances
+    :type grav_bool: float
+    :param force_bool: Flag for enabling external forces disturbances
+    :type force_bool: float
+    '''
+    self.grav_bool = grav_bool
+    self.force_bool = force_bool
+    return 
+
+  def get_Ldes(self, L_des) -> None:
+    '''
+    Method for getting the desired angular momentum around the pivot
+    :param L_des: The desired angular momentum to append to the reference's list
+    :type L_des: list[float, float, float]
+    '''
+    #self.L_des.extend(L_des)
+    self.L_des.append(L_des)
+    return
+  
+  def set_Ldes(self, L_des) -> None:
+    '''
+    Method for setting the possibility of catching the desired angular momentum around the pivot
+    :param L_des: yes or no based on if you want to get it or not
+    :type L_des: bool
+    '''
+    self.get_L_reference = L_des
+    return
+    
+  def compute_Ldes(self) -> None:
+    '''
+    Method for printing dimentions of the desired angular momentum'slist 
+    '''
+
+    print(len(self.L_des), self.L_des[0].shape)
+    return
+  
