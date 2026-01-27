@@ -45,8 +45,8 @@ def main(train = False, load = False, catch_reference = False, custom_action = T
         env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=1000.0, clip_reward=500)
         model = PPO(NoBiasActionBiasACPolicy, env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
     else:
-        env = VecNormalize.load("vec_normalized.pkl", env)
-        model = PPO.load("ppo_hrp4_multienv", env)
+        env = VecNormalize.load("env_normalized_AM.pkl", env)
+        model = PPO.load("ppo_hrp4_AM", env)
     
     #new_logger = configure('./multi.log', ["stdout", "json", "log", "tensorboard"])
     #model.set_logger(new_logger)
@@ -109,5 +109,5 @@ def main(train = False, load = False, catch_reference = False, custom_action = T
 
 if __name__ == "__main__":
 
-    main(train = True, load = False, catch_reference = True, custom_action = False)
+    main(train = True, load = True, catch_reference = True, custom_action = False)
     #SB3_test() # test for stable baseline 3

@@ -84,7 +84,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_rewards : list[ float            ]
 
   REWARD_FUNC_CONSTANTS = {
-          'r_alive' : 5.0,
+          'r_alive' : 3.0,
     
             'w_ZmP' : 0.3,
         'sigma_ZmP' : 0.1,
@@ -100,7 +100,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
          'w_smooth' : 0.1,
      'sigma_smooth' : 0.1,
      
-          'w_footstep' : 1.0,
+          'w_footstep' : 0.8,
       'sigma_footstep' : 0.15,
 'sigma_footstep_bonus' : 0.2,
       'distance_bonus' : 0.35,
@@ -108,15 +108,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'terminated_penalty' : -1000.0,
     'CoM_H_perc_safe' : 0.1,
     
-    'w_L' : 5.0,
+    'w_L' : 3.5,
     'sigma_L': 0.05,
 
-    'action_weight_sw'  : 2.5,
-    'action_weight_ds'  : 2.5,
+    'action_weight_sw'  : 4.5,
+    'action_weight_ds'  : 4.5,
     'action_damping' : 0.001,
     'r_forward' : 10.0,
-    'end_of_plan' : 100.0,
-    'footstep_checkpoint' : 4.0
+    'end_of_plan' : 1000.0,
+    'footstep_checkpoint' : 5.0
   }
 
   PERTURBATION_PARAMETHERS = {
@@ -124,7 +124,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'gravity_y_range' : np.array([0.06, 0.12]) * 1,
     'gravity_change_prob' : 0 * 0.01, # 1%
     'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
-    'force_range': np.array([50, 150]) * 0.3,   # Newton
+    'force_range': np.array([50, 150]) * 0.7,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
 
@@ -783,7 +783,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
   def Leveling(self) -> None:
     if self.end_of_plan_condition(): 
         self.end_of_plan_counter += self.LEVELING_SYSTEM['exp_gain']
-        if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] == 0: 
+        if self.end_of_plan_counter % self.LEVELING_SYSTEM['exp_to_new_level'] or (self.end_of_plan_counter % (self.LEVELING_SYSTEM['exp_to_new_level'] +1)) == 0: 
           self.level += 1
           print(colored(f'NEW LWVEL: {self.level}', 'yellow')) 
 
