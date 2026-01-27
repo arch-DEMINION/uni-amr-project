@@ -87,7 +87,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         # initialize footstep planner
         # if trajectory is < 0 pick a random one, except validation ones
         if trajectory < 0:
-            trajectory = random.randint(0, 7)
+            trajectory = random.randint(0, 6)
 
         if trajectory == 100:
             trajectory = random.randint(101, 103)
@@ -101,10 +101,10 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                 reference = [(0., 0., 0.)] * 10
             case 1:
                 # forwards, then backwards
-                reference = [(0.1, 0., 0.)] * 25 + [(-0.1, 0., 0.)] * 25
+                reference = [(0.1, 0., 0.)] * 10 + [(-0.1, 0., 0.)] * 10
             case 2:
                 # backwards, then forwards
-                reference = [(-0.1, 0., 0.)] * 25 + [(0.1, 0., 0.)] * 25
+                reference = [(-0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
             case 3:
                 # turn on the spot
                 reference = [(0.0, 0., 0.12)] * 25
@@ -113,10 +113,10 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                 reference = [(0.0, 0., -0.12)] * 25
             case 5:
                 # to the left, the to the right
-                reference = [(0.0, -0.1, 0.)] * 25 + [(0.0, 0.1, 0.)] * 25
+                reference = [(0.0, -0.1, 0.)] * 10 + [(0.0, 0.1, 0.)] * 10
             case 6:
                 # to the right
-                reference = [(0.0, 0.1, 0.)] * 25 + [(0.0, -0.1, 0.)] * 25
+                reference = [(0.0, 0.1, 0.)] * 10 + [(0.0, -0.1, 0.)] * 10
             # use the following for validation, hence
             case 101:
                 # to the left, the to the right
@@ -125,9 +125,9 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                 # to the right
                 reference = [(0.1, 0.1, 0.)] * 25
             case 103:
-                # weird reference sine like
-                reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10 # + [(0., 0., 0.)] * 10 
-               # reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10   # reference di scianca che funziona
+                # weird sine like
+                reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 10 
+        reference += [(0., 0., 0.)]
 
         self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
