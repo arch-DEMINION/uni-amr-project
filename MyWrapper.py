@@ -351,18 +351,18 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # advance in the world until the first foot starts moving
     # this is to avoid having the agent work before MPC starts working and the robot cannot move
-    def robot_moving() -> bool:
-      foot = self.node.footstep_planner.plan[0]['foot_id']
-      state = self.node.retrieve_state()
-      initial = self.node.initial[foot]['pos']
-      foot_pos = state[foot]['pos']
-      return foot_pos[5] >= initial[5] + 1e-2
+    # def robot_moving() -> bool:
+    #   foot = self.node.footstep_planner.plan[0]['foot_id']
+    #   state = self.node.retrieve_state()
+    #   initial = self.node.initial[foot]['pos']
+    #   foot_pos = state[foot]['pos']
+    #   return foot_pos[5] >= initial[5] + 1e-2
     
-    # TODO: check if this has any impact with changing gravity
-    while not robot_moving():
-      self.node.customPreStep()
-      self.world.step()
-      self.render()
+    # # TODO: check if this has any impact with changing gravity
+    # while not robot_moving():
+    #   self.node.customPreStep()
+    #   self.world.step()
+    #   self.render()
 
     self.PERTURBATION_PARAMETERS['gravity_x_range'] = self.init_gravity_ranges[0]*self.level*0.01
     self.PERTURBATION_PARAMETERS['gravity_y_range'] = self.init_gravity_ranges[1]*self.level*0.01
