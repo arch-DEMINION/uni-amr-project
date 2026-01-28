@@ -30,10 +30,9 @@ def start_simulation(model_path: str, vecnorm_path: str):
     env.UpdatePlot()
     input("finished")
     
-def main(train = True, load = False, filename_model=f"ppo_hrp4_multienv_AM.zip", filename_env=f"vec_normalized_AM.pkl", desired_trajectory=0, footstep_scaler=0.9, catch_reference=False) -> None:
+def main(n_envs = 8, train = True, load = False, filename_model=f"ppo_hrp4_multienv_AM.zip", filename_env=f"vec_normalized_AM.pkl", desired_trajectory=0, footstep_scaler=0.9, catch_reference=False) -> None:
     
-    n_envs = 1
-    vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs, env_kwargs={"verbose": False, "render": True, "frequency_change_grav" : 1, "desired_trajectory": desired_trajectory, "footstep_scaler": footstep_scaler, "get_L_reference" : catch_reference,  "get_ref_node" : catch_reference}, vec_env_cls=SubprocVecEnv)
+    vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs, env_kwargs={"verbose": False, "render": n_envs==1, "frequency_change_grav" : 1, "desired_trajectory": desired_trajectory, "footstep_scaler": footstep_scaler, "get_L_reference" : catch_reference,  "get_ref_node" : catch_reference}, vec_env_cls=SubprocVecEnv)
     vec_env = VecFrameStack(vec_env, n_stack=4)
     
     # for new environment
@@ -76,7 +75,7 @@ def main(train = True, load = False, filename_model=f"ppo_hrp4_multienv_AM.zip",
            # base_env.env_method("set_get_ref", False, indices=env_i)   # to enable getting reference L into self.node
         
         
-    print("Getted all desired L\n")
+        print("Getted all desired L\n")
         
     if train:
         vec_env.training = True
@@ -94,4 +93,4 @@ def main(train = True, load = False, filename_model=f"ppo_hrp4_multienv_AM.zip",
     start_simulation(model_path=filename_model,vecnorm_path=filename_env)    
 
 if __name__ == "__main__":
-    main()   
+    main(n_envs=8)   
