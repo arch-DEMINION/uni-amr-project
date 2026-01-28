@@ -10,7 +10,7 @@ import filter
 import foot_trajectory_generator as ftg
 from logger import Logger
 import timeit
-from math import sin,cos
+from math import sin,cos,sqrt
 import random
 import utils as utils
 
@@ -44,6 +44,13 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         self.rsole = hrp4.getBodyNode('r_sole')
         self.torso = hrp4.getBodyNode('torso')
         self.base  = hrp4.getBodyNode('body')
+
+        detector = self.world.getConstraintSolver().getCollisionDetector()
+        self.feet_coll_group = detector.createCollisionGroup()
+        self.feet_coll_group.addShapeFramesOf(self.rsole)
+        self.feet_coll_group.addShapeFramesOf(self.lsole)
+        self.feet_coll_option = dart.collision.CollisionOption()
+        self.feet_coll_result = dart.collision.CollisionResult()
 
         for i in range(hrp4.getNumJoints()):
             joint = hrp4.getJoint(i)
@@ -234,6 +241,10 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         # set acceleration commands
         for i in range(self.params['dof'] - 6):
             self.hrp4.setCommand(i + 6, commands[i])
+
+        feet_colliding = self.feet_coll_group.collide(self.feet_coll_option, self.feet_coll_result)
+        if feet_colliding:
+            raise Exception("'feet_collision'")
 
         # log and plot
         self.logger.log_data(self.current, self.desired)

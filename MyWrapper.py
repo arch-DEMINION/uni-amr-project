@@ -543,9 +543,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # termination penalty and alive bonus
-    terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.solver_status == 'maximum iterations reached' else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.solver_status == 'solved inaccurate'          else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.solver_status == 'problem non convex'         else 0
+    terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.solver_status == 'solved inaccurate'          else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.solver_status == 'problem non convex'         else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 2.0 if self.solver_status == 'feet_collision'         else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty']
     
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
@@ -559,14 +560,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # change reward depending on gait phase
     current_reward += self.R_sw(state, action) if state['remaining_time'] > 0 else self.R_end(state, action)
 
-    # try to keep the feet at a proper distance to avoid self collisions
-    # penalty for placing the foots to close
-    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
-    # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
-    r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
-                                 self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
-                                 self.REWARD_FUNC_CONSTANTS['w_footstep']) 
-    current_reward += r_next_footstep + r_next_footstep_bonus
+    # # try to keep the feet at a proper distance to avoid self collisions
+    # # penalty for placing the foots to close
+    # r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
+    # # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
+    # r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
+    #                              self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
+    #                              self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    # current_reward += r_next_footstep + r_next_footstep_bonus
     
     # reward for angular momentum tracking
     if len(self.L_des) != 0:
