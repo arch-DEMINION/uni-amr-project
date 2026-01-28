@@ -149,7 +149,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                agent_frequency : int = 1,
                frequency_change_grav : int = 1,
                footstep_scaler: float = 0.9,
-               action_space_bounds: float = 0.02, # originally 0.2
+               action_space_bounds: float = 0.02,
                desired_trajectory: int = -1,
                curriculum_learning: bool = False,
                grav_bool : float= 1.0,
