@@ -363,7 +363,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     #   self.node.customPreStep()
     #   self.world.step()
     #   self.render()
-
+    
     self.PERTURBATION_PARAMETERS['gravity_x_range'] = self.init_gravity_ranges[0]*self.level*0.01
     self.PERTURBATION_PARAMETERS['gravity_y_range'] = self.init_gravity_ranges[1]*self.level*0.01
     
@@ -375,6 +375,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # restore the perturbations
     self.PERTURBATION_PARAMETERS['ext_force_appl_prob'], self.PERTURBATION_PARAMETERS['gravity_change_prob'] = pre_value 
     print("\nStarting episode: " + str(self.episodes) + "\n")
+
+    # default draw gravity
+    self.gravity_skel = None
+    self.DrawGravityVector(self.angle_x, self.angle_y)
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
@@ -543,10 +547,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # termination penalty and alive bonus
-    terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.solver_status == 'solved inaccurate'          else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.solver_status == 'problem non convex'         else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 2.0 if self.solver_status == 'feet_collision'         else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty']
+    terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.solver_status == 'maximum iterations reached' else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.solver_status == 'solved inaccurate'          else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.solver_status == 'problem non convex'         else 0
     
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
@@ -560,14 +563,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # change reward depending on gait phase
     current_reward += self.R_sw(state, action) if state['remaining_time'] > 0 else self.R_end(state, action)
 
-    # # try to keep the feet at a proper distance to avoid self collisions
-    # # penalty for placing the foots to close
-    # r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
-    # # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
-    # r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
-    #                              self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
-    #                              self.REWARD_FUNC_CONSTANTS['w_footstep']) 
-    # current_reward += r_next_footstep + r_next_footstep_bonus
+    # try to keep the feet at a proper distance to avoid self collisions
+    # penalty for placing the foots to close
+    r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
+    # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
+    r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
+                                 self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
+                                 self.REWARD_FUNC_CONSTANTS['w_footstep']) 
+    current_reward += r_next_footstep + r_next_footstep_bonus
     
     # reward for angular momentum tracking
     if len(self.L_des) != 0:
@@ -675,7 +678,40 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.angle_y = self.angle_y*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_y[1] - range_y[0])) + range_y[0])  #0.0
     self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_x[1] - range_x[0])) + range_x[0])  # from 3,4° to 6,8°
       
-    if apply_gravity: self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
+    if apply_gravity:
+      self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
+      self.DrawGravityVector(self, self.angle_x, self.angle_y)
+  
+  def DrawGravityVector(self, angle_x, angle_y):
+    if not self.render:
+      return
+
+    if self.gravity_skel is not None:
+        self.node.world.removeSkeleton(self.gravity_skel)
+
+    self.gravity_skel = dart.dynamics.Skeleton(f"gravity")
+    self.gravity_skel.setGravity([0.0, 0.0, 0.0]) 
+    self.gravity_skel.setMobile(False)
+
+    joint, body = self.gravity_skel.createFreeJointAndBodyNodePair()
+    
+    joint.setName(f"gravity_joint")  
+    body.setName(f"gravity_body")  
+    # Create arrow shape
+    length=0.85
+    origin = np.array([0.,0., 2.2])
+    gravity = np.array([-length * np.sin(angle_y), length* np.cos(angle_y) * np.sin(angle_x), -length*np.cos(angle_x)*np.cos(angle_y)])
+
+    shape = dart.dynamics.ArrowShape(tail=origin, head=origin+gravity)
+    
+    # Create shape node with visual, collision, and dynamics aspects  
+    shape_node = body.createShapeNode(shape)  
+    
+    # Create aspects separately  
+    visual = shape_node.createVisualAspect()  
+    visual.setColor([0.0, 1., 0.0, 1.0]) # green
+    self.node.world.addSkeleton(self.gravity_skel)
+
       
   def Get_random_force(self, range_f : list[float, float], range_p : list[float, float]) -> None:
     '''
