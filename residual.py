@@ -1,7 +1,7 @@
 import numpy as np
 
 class residual_dynamics:
-    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 100, w_size = 2, threshold = 0.2) -> None:
+    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 100, w_size = 2, threshold = 1) -> None:
 
         self.time = time
         self.x = starting_x
@@ -31,8 +31,8 @@ class residual_dynamics:
         E = 0.5 * pre_x2.T@pre_x2 / np.pow(self.etah, 2)
 
         # compute the integral using old state and control input  | self.r_history[max(len(self.r_history)-2, 0)]
-        self.integral += 0.5 * Dt * ( pre_pre_x1.T @ pre_pre_x2 - pre_pre_x2.T @ self.pre_u - self.g*pre_pre_x2[2]  +\
-                                          pre_x1.T @     pre_x2 -     pre_x2.T @ self.u     - self.g*    pre_x2[2] + 2*self.r)
+        self.integral += 0.5 * Dt * ( pre_pre_x1.T @ pre_pre_x2 - pre_pre_x2.T @ self.pre_u - np.pow(self.etah, 2)*self.g*pre_pre_x2[2]  +\
+                                          pre_x1.T @     pre_x2 -     pre_x2.T @ self.u     - np.pow(self.etah, 2)*self.g*    pre_x2[2] + 2*self.r)
 
         self.integral = min(self.integral, 1e3)
 
