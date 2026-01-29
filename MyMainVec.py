@@ -30,9 +30,9 @@ def start_simulation(model_path: str, vecnorm_path: str):
     env.UpdatePlot()
     input("finished")
     
-def main(n_envs = 8, train = True, load = False, filename_model=f"ppo_hrp4_multienv_AM.zip", filename_env=f"vec_normalized_AM.pkl", desired_trajectory=0, footstep_scaler=0.9, catch_reference=False) -> None:
+def main(n_envs = 1, train = True, load = False, filename_model=f"ppo_hrp4_multienv_AM.zip", filename_env=f"vec_normalized_AM.pkl", desired_trajectory=100, footstep_scaler=0.9, catch_reference=False, action_decision = False) -> None:
     
-    vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs, env_kwargs={"verbose": False, "render": n_envs==1, "frequency_change_grav" : 1, "desired_trajectory": desired_trajectory, "footstep_scaler": footstep_scaler, "get_L_reference" : catch_reference,  "get_ref_node" : catch_reference}, vec_env_cls=SubprocVecEnv)
+    vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs, env_kwargs={"verbose": False, "render": n_envs == 1, "frequency_change_grav" : 1, "desired_trajectory": desired_trajectory, "footstep_scaler": footstep_scaler, "get_L_reference" : catch_reference,  "get_ref_node" : catch_reference, "action_decision": action_decision}, vec_env_cls=SubprocVecEnv)
     vec_env = VecFrameStack(vec_env, n_stack=4)
     
     # for new environment
@@ -72,7 +72,7 @@ def main(n_envs = 8, train = True, load = False, filename_model=f"ppo_hrp4_multi
             base_env.env_method("compute_Ldes", indices=env_i)
             base_env.env_method("set_Ldes", False, indices=env_i) # to disable getting reference L during training
             base_env.env_method("set_disturbances", 1.0, 1.0, indices=env_i)  # to enable disturbances during training
-           # base_env.env_method("set_get_ref", False, indices=env_i)   # to enable getting reference L into self.node
+           # base_env.env_method("set_get_ref", False, indices=env_i)   # to disable getting reference L into self.node
         
         
         print("Getted all desired L\n")
@@ -93,4 +93,4 @@ def main(n_envs = 8, train = True, load = False, filename_model=f"ppo_hrp4_multi
     start_simulation(model_path=filename_model,vecnorm_path=filename_env)    
 
 if __name__ == "__main__":
-    main(n_envs=8)   
+    main(n_envs=1)   

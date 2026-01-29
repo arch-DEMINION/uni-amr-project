@@ -158,4 +158,26 @@ def incline_floor(angle_x: float, angle_y : float):
 def decompose_gravity(angle_x, angle_y) -> list[float, float, float]:
     g = 9.81
     return [-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)]
+
+def DrawArrow(world, head, tail, name=f"arrow", color = [0., 1.0, 0., 1.]) -> dart.dynamics.Skeleton:
+    skel = dart.dynamics.Skeleton(name)
+    skel.setGravity([0.0, 0.0, 0.0]) 
+    skel.setMobile(False)
+
+    joint, body = skel.createFreeJointAndBodyNodePair()
+
+    joint.setName(f"{name}_joint")  
+    body.setName(f"{name}_body")  
+    # Create arrow shape
+    shape = dart.dynamics.ArrowShape(tail=tail, head=head)
+
+    # Create shape node with visual, collision, and dynamics aspects  
+    shape_node = body.createShapeNode(shape)  
+
+    # Create aspects separately  
+    visual = shape_node.createVisualAspect()  
+    visual.setColor(color) # green
+    world.addSkeleton(skel)
+
+    return skel
     

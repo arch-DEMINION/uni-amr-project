@@ -155,7 +155,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                grav_bool : float= 1.0,
                force_bool : float =1.0,
                get_L_reference : bool = False,
-               get_ref_node :bool= False):
+               get_ref_node :bool= False,
+               action_decision : bool = False):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -203,6 +204,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.grav_bool = grav_bool
     self.force_bool = force_bool
     self.L_des = []
+    self.action_decision = action_decision
     
     colorama.init()
 
@@ -214,11 +216,24 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # size of the observation and action spaces
     self.obs_size = len(state) # automatically take the length of the state
-    self.action_size = 3 # the action shuld be the displacement alog x y and angular: [Dx, Dy, Dtheta]
-    
+
+    if self.action_decision:
+        action_size = 4 # the action should be the displacement alog x y and angular, and discrete decision if act or not: [Dx, Dy, Dtheta, act]
+    else:
+        action_size = 3 # the action should be the displacement alog x y and angular: [Dx, Dy, Dtheta]
+
+    self.action_size = action_size
     # define the observation and action spaces as box without range
     self.observation_space = gym.spaces.Box(low = -np.inf, high = np.inf, shape = (self.obs_size,)   , dtype = np.float64) 
-    self.action_space      = gym.spaces.Box(low = -action_space_bounds    , high = action_space_bounds   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
+    
+    if self.action_decision:
+      
+      low = np.array([-action_space_bounds, -action_space_bounds, -action_space_bounds, 0.0],dtype=np.float64)
+      high = np.array([ action_space_bounds,  action_space_bounds,  action_space_bounds, 1.0],dtype=np.float64)
+      self.action_space = gym.spaces.Box(low=low,high=high,dtype=np.float64)
+      
+    else:
+      self.action_space      = gym.spaces.Box(low = -action_space_bounds    , high = action_space_bounds   , shape = (self.action_size,), dtype = np.float64) # action space must be limited
 
     if self.verbose: print(f'environment \"{self.name}\" initialized')
 
@@ -262,7 +277,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
       if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob'] * self.force_bool:
         random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETERS['force_range'], self.PERTURBATION_PARAMETERS['CoM_offset_range'])
         random_body.addExtForce(random_force, random_point, True)
-        #if self.verbose: print("\nAdded force: " + str(random_force) + " at body: " + str(random_body_name)+ "\n")
+        W = random_body.getWorldTransform().matrix()
+        p = (W@np.concatenate((random_point, np.ones(1))))[:3]
+        if self.force_skel is not None:
+          self.node.world.removeSkeleton(self.force_skel)
+        self.force_skel = utils.DrawArrow(self.node.world, p, 0.01*(p-random_force), name="force")
         print(colored(f"\nApplied force: {random_force} at body:  {random_body_name} \n", self.COLOR_CODE['forces']))
         self.world.step()
         self.render()
@@ -335,7 +354,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions useful for computing the rewards
     self.previous_states  = []
-    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'list' : np.array([0, 0, 0])}]
+    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'act':1.0, 'list' : np.array([0, 0, 0,1 ])}]
     self.previous_rewards = []
 
     self.angle_x = 0.0
@@ -378,6 +397,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # default draw gravity
     self.gravity_skel = None
+    self.force_skel = None
     self.DrawGravityVector(self.angle_x, self.angle_y)
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
@@ -494,11 +514,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :return: The action as dictonary of float that can be used to perturbate the current footsteps
     :rtype: dict[str, float]
     '''
+    if self.action_decision:
+      act = 1.0 if action[3] >= 0.5 else 0.0
     
-    # compute the current action as a dictionary
+    # compute the current action as a dictionary 
     action_dict = {'Dx'   : action[0],
                    'Dy'   : action[1],
                    'Dth'  : action[2],
+                   'act'  : 1.0 if  not self.action_decision else act,
                    'list' : action}
 
     # add the current action dict to the list of previous actions
@@ -519,11 +542,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     index = self.node.footstep_planner.get_step_index_at_time(self.node.time)
     current_footestep = self.node.footstep_planner.plan[index]
     z_support_footstep = current_footestep['ang'][2]
+    act = action_dict['act']
 
     # compute the position displacemnt along the support foot reference
     pos_displacement = np.array([action_dict['Dx'] * cos(z_support_footstep) - action_dict['Dy'] * sin(z_support_footstep),\
-                                 action_dict['Dx'] * sin(z_support_footstep) + action_dict['Dy'] * cos(z_support_footstep), 0.0])
-    ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])
+                                 action_dict['Dx'] * sin(z_support_footstep) + action_dict['Dy'] * cos(z_support_footstep), 0.0])*act
+    ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])* act
 
     # scale if is in ss and time is running out
     if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss':
@@ -659,7 +683,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
 
     # penalize large actions when in double support
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'], action['list'])
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_ds']*np.dot(action['list'][0:3], action['list'][0:3])
 
     return action_penalty 
   
@@ -689,18 +713,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     if self.gravity_skel is not None:
         self.node.world.removeSkeleton(self.gravity_skel)
 
-    self.gravity_skel = dart.dynamics.Skeleton(f"gravity")
-    self.gravity_skel.setGravity([0.0, 0.0, 0.0]) 
-    self.gravity_skel.setMobile(False)
 
-    joint, body = self.gravity_skel.createFreeJointAndBodyNodePair()
-    
-    joint.setName(f"gravity_joint")  
-    body.setName(f"gravity_body")  
-    # Create arrow shape
     length=0.85
     origin = np.array([0.,0., 2.2])
     gravity = np.array([-length * np.sin(angle_y), length* np.cos(angle_y) * np.sin(angle_x), -length*np.cos(angle_x)*np.cos(angle_y)])
+    utils.DrawArrow(self.node.world, origin+gravity, origin)
 
     shape = dart.dynamics.ArrowShape(tail=origin, head=origin+gravity)
     
