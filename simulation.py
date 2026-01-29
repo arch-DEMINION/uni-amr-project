@@ -181,7 +181,11 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                                       x)
 
         # initialize residual 
-        self.residual = residual_dynamics(time = 0, starting_x=np.array([x[0], x[1], x[3], x[4], x[6], x[7]]), etah=self.params['eta'], g = self.params['g'])
+        self.residual = residual_dynamics(time = 0, 
+                                          starting_x=np.array([x[0], x[1], x[3], x[4], x[6], x[7]]),
+                                          starting_u=np.array([x[2], x[5], x[8]]),
+                                          etah=self.params['eta'], 
+                                          g = self.params['g'])
 
         # initialize logger and plots
         self.logger = Logger(self.initial)
@@ -200,13 +204,17 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         #update residual signal
         if self.footstep_planner.get_phase_at_time(self.time) == 'ss':
             if self.footstep_planner.get_current_footstep_from_plan(self.time)['foot_id'] == self.footstep_planner.get_current_footstep_from_plan(self.residual.time)['foot_id']:
-                self.residual.update(x = np.array([x_flt[0], x_flt[1], x_flt[3], x_flt[4], x_flt[6], x_flt[7]]), 
-                                    u = np.array([self.current['zmp']['pos'][0], self.current['zmp']['pos'][1], self.current['zmp']['pos'][2]]),
-                                    t = self.time)
+                self.residual.update(x = np.array([self.current['com']['pos'][0], self.current['com']['vel'][0],
+                                                   self.current['com']['pos'][1], self.current['com']['vel'][1],
+                                                   self.current['com']['pos'][2], self.current['com']['vel'][2]]), 
+                                     u = np.array([self.current['zmp']['pos'][0], self.current['zmp']['pos'][1], self.current['zmp']['pos'][2]]),
+                                     t = self.time)
             else:
-                self.residual = residual_dynamics(time = self.time, starting_x = np.array([x_flt[0], x_flt[1], x_flt[3], x_flt[4], x_flt[6], x_flt[7]]),
-                                                etah=self.params['eta'],
-                                                g = self.params['g'])
+                self.residual = residual_dynamics(time = self.time, 
+                                                  starting_x = np.array([x_flt[0], x_flt[1], x_flt[3], x_flt[4], x_flt[6], x_flt[7]]),
+                                                  starting_u = np.array([x_flt[2], x_flt[5], x_flt[8]]),
+                                                  etah=self.params['eta'],
+                                                  g = self.params['g'])
 
             
         # update current state using kalman filter output
@@ -448,7 +456,7 @@ def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0, trajectory=-1,
 
 if __name__ == "__main__":
     render = True
-    world, viewer, node = simulation_setup(render=render)
+    world, viewer, node = simulation_setup(render=render, trajectory=103)
     node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
 
     print(node.footstep_planner.plan)

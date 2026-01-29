@@ -93,4 +93,4 @@ def main(n_envs = 1, train = True, load = False, filename_model=f"ppo_hrp4_multi
     start_simulation(model_path=filename_model,vecnorm_path=filename_env)    
 
 if __name__ == "__main__":
-    main(n_envs=1)   
+    main(n_envs=8)   

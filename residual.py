@@ -1,7 +1,7 @@
 import numpy as np
 
 class residual_dynamics:
-    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), etah : float = 1, g: float = 9.81, gain : float = 100, w_size = 10, threshold = 0.01) -> None:
+    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 50, w_size = 30, threshold = 0.02) -> None:
 
         self.time = time
         self.x = starting_x
@@ -11,11 +11,12 @@ class residual_dynamics:
         self.g = g
         self.w_size = w_size
         self.threshold = threshold
+        self.u = starting_u
 
         self.r = 0
         self.integral = 0
         self.E0 = 0.5 * starting_x[1::2].T @ starting_x[1::2] / np.pow(self.etah, 2)
-        self.pre_u = np.zeros(3)
+        self.pre_u = starting_u
 
         self.r_history = [self.r]
         self.mean_history = [0]
@@ -27,11 +28,11 @@ class residual_dynamics:
         pre_pre_x1, pre_pre_x2 = self.pre_x[0::2], self.pre_x[1::2] # split the old state in positions and velocity
 
         # compute the energy of the system using new state
-        E = 0.5 * x2.T@x2 / np.pow(self.etah, 2)
+        E = 0.5 * pre_x2.T@pre_x2 / np.pow(self.etah, 2)
 
         # compute the integral using old state and control input
         self.integral += 0.5 * Dt * ( pre_pre_x1.T @ pre_pre_x2 - pre_pre_x2.T @ self.pre_u - self.g*pre_pre_x2[2] + self.r_history[max(len(self.r_history)-2, 0)] +\
-                                          pre_x1.T @     pre_x2 -     pre_x2.T @ u          - self.g*    pre_x2[2] + self.r)
+                                          pre_x1.T @     pre_x2 -     pre_x2.T @ self.u          - self.g*    pre_x2[2] + self.r)
 
         self.integral = min(self.integral, 1e3)
 
@@ -41,8 +42,10 @@ class residual_dynamics:
         self.pre_x = self.x
         self.x = x
         self.time = t
+        self.pre_u = self.u
+        self.u = u
         self.r_history.append(np.pow(self.r, 2))
-        #print(f"[R]: {self.sliding_window_mean(self.w_size):0.4f}, {self.IsPerturbed()}")
+        print(f"[R]: {self.sliding_window_mean(self.w_size):0.4f}, {self.IsPerturbed()}")
         return self.r
     
     def sliding_window_mean(self, w_size : int = 1) -> float:
