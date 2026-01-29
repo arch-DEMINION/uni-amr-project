@@ -282,7 +282,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
         if self.force_skel is not None:
           self.node.world.removeSkeleton(self.force_skel)
         self.force_skel = utils.DrawArrow(self.node.world, p, 0.01*(p-random_force), name="force")
+<<<<<<< HEAD
         print(colored(f"\nApplied force: {random_force} at body:  {random_body_name} \n", self.COLOR_CODE['forces']))
+=======
+
+        print(colored(f"\nApplied force: {random_force} at point {p} ({random_body_name}) \n", self.COLOR_CODE['forces']))
+>>>>>>> 251abf67efbeca32775dbcba108a4e49f30a076c
         self.world.step()
         self.render()
         
@@ -713,23 +718,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
     if self.gravity_skel is not None:
         self.node.world.removeSkeleton(self.gravity_skel)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 251abf67efbeca32775dbcba108a4e49f30a076c
     length=0.85
     origin = np.array([0.,0., 2.2])
     gravity = np.array([-length * np.sin(angle_y), length* np.cos(angle_y) * np.sin(angle_x), -length*np.cos(angle_x)*np.cos(angle_y)])
     utils.DrawArrow(self.node.world, origin+gravity, origin)
 
-    shape = dart.dynamics.ArrowShape(tail=origin, head=origin+gravity)
-    
-    # Create shape node with visual, collision, and dynamics aspects  
-    shape_node = body.createShapeNode(shape)  
-    
-    # Create aspects separately  
-    visual = shape_node.createVisualAspect()  
-    visual.setColor([0.0, 1., 0.0, 1.0]) # green
-    self.node.world.addSkeleton(self.gravity_skel)
-
-      
   def Get_random_force(self, range_f : list[float, float], range_p : list[float, float]) -> None:
     '''
     Method for applying a random force on a random point of the robot at a certain time step
