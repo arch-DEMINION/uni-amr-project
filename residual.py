@@ -1,7 +1,7 @@
 import numpy as np
 
 class residual_dynamics:
-    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 50, w_size = 30, threshold = 0.02) -> None:
+    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 100, w_size = 2, threshold = 0.2) -> None:
 
         self.time = time
         self.x = starting_x
@@ -30,9 +30,9 @@ class residual_dynamics:
         # compute the energy of the system using new state
         E = 0.5 * pre_x2.T@pre_x2 / np.pow(self.etah, 2)
 
-        # compute the integral using old state and control input
-        self.integral += 0.5 * Dt * ( pre_pre_x1.T @ pre_pre_x2 - pre_pre_x2.T @ self.pre_u - self.g*pre_pre_x2[2] + self.r_history[max(len(self.r_history)-2, 0)] +\
-                                          pre_x1.T @     pre_x2 -     pre_x2.T @ self.u          - self.g*    pre_x2[2] + self.r)
+        # compute the integral using old state and control input  | self.r_history[max(len(self.r_history)-2, 0)]
+        self.integral += 0.5 * Dt * ( pre_pre_x1.T @ pre_pre_x2 - pre_pre_x2.T @ self.pre_u - self.g*pre_pre_x2[2]  +\
+                                          pre_x1.T @     pre_x2 -     pre_x2.T @ self.u     - self.g*    pre_x2[2] + 2*self.r)
 
         self.integral = min(self.integral, 1e3)
 
@@ -44,8 +44,8 @@ class residual_dynamics:
         self.time = t
         self.pre_u = self.u
         self.u = u
-        self.r_history.append(np.pow(self.r, 2))
-        print(f"[R]: {self.sliding_window_mean(self.w_size):0.4f}, {self.IsPerturbed()}")
+        self.r_history.append(self.r)
+        print(f"[R]: {self.IsPerturbed()}: {self.sliding_window_mean(self.w_size):0.4f}")
         return self.r
     
     def sliding_window_mean(self, w_size : int = 1) -> float:
@@ -56,4 +56,4 @@ class residual_dynamics:
     def IsPerturbed(self) -> bool:
         if len(self.mean_history) <= self.w_size: return True
 
-        return sum( [int(e > self.threshold) for e in self.mean_history[-self.w_size: -1]] ) >= self.w_size*0.5
+        return sum( [int(np.abs(e) > self.threshold) for e in self.mean_history[-self.w_size: -1]] ) >= self.w_size*0.5
