@@ -259,6 +259,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # get termination or truncation conditions
     # we consider the safe set to be whenever to termination conditions occur
     terminated = False
+
     try:
       # take a step in to the environment
       starting_step = self.node.footstep_planner.get_step_index_at_time(self.node.time) # remember the starting step
@@ -273,15 +274,33 @@ class ISMPC2gym_env_wrapper(gym.Env):
         self.solver_status = self.node.mpc.sol.stats()["return_status"]  
         self.render()
       
+      
+      # MPC state, for logging purposes
+      self.mpc_state = self.node.retrieve_state()
+
       # apply the forces 
       if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob'] * self.force_bool:
         random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETERS['force_range'], self.PERTURBATION_PARAMETERS['CoM_offset_range'])
+
+
         random_body.addExtForce(random_force, random_point, True)
         W = random_body.getWorldTransform().matrix()
         p = (W@np.concatenate((random_point, np.ones(1))))[:3]
         if self.force_skel is not None:
           self.node.world.removeSkeleton(self.force_skel)
-        self.force_skel = utils.DrawArrow(self.node.world, p, 0.01*(p-random_force), name="force")
+
+        head = p
+        tail = 0.01*(p-random_force)
+        self.force_skel = utils.DrawArrow(self.node.world, head=head, tail=tail, name="force")
+
+        self.forces.append({
+          "timestep": self.current_step,
+          "force": random_force,
+          "point_world": p,
+          "arrow_head": head,
+          "arrow_tail": tail
+        })
+
         print(colored(f"\nApplied force: {random_force} at point {p} ({random_body_name}) \n", self.COLOR_CODE['forces']))
         self.world.step()
         self.render()
@@ -310,7 +329,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # truncate the episode after a set number of steps or when the plan has been completed
     truncated = self.current_step > self.max_steps or self.end_of_plan_condition()
-
+    self.truncated = truncated
+    self.terminated = terminated
+    
     if terminated or truncated:
         print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['reward']))
     
@@ -349,6 +370,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
       #self.Leveling()
 
     self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, trajectory=self.desired_trajectory, get_reference=self.get_ref_node)
+    # these variables are saved for logging purposes
+    self.mpc_state = self.node.retrieve_state()
+    self.plan = self.node.footstep_planner.plan
+    self.original_plan = self.node.footstep_planner.original_plan
+    self.terminated = False
+    self.truncated = False
 
     self.is_plot_init = False
 
@@ -357,13 +384,17 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'act':1.0, 'list' : np.array([0, 0, 0,1 ])}]
     self.previous_rewards = []
 
+    self.forces = []
+    self.gravities = []
+
     self.angle_x = 0.0
     self.angle_y = 0.0
 
-    # reset the states and steps
-    state_array, state_dict = self.GetState()
     self.current_step = 0
     self.current_MPC_step = 0
+    
+    # reset the states and steps
+    state_array, state_dict = self.GetState()
     
     self.footstep_checkpoint_given = False
     self.initial_foot_dist = np.linalg.norm(self.node.initial['lfoot']['pos'][:3] - self.node.initial['rfoot']['pos'][:3], ord=2)
@@ -398,7 +429,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # default draw gravity
     self.gravity_skel = None
     self.force_skel = None
-    self.DrawGravityVector(self.angle_x, self.angle_y)
+    self.DrawGravity(self.angle_x, self.angle_y)
 
     info = {'current steps' : self.current_step, 'max steps' : self.max_steps}
 
@@ -461,7 +492,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     support_foot_pos = ismpc_state[support_foot_str]['pos']
     support_foot_pos = np.array([support_foot_pos[i] for i in [3, 4, 2]])
 
-    support_foot_gpos = self.node.retrieve_state()[support_foot_str]['pos']
+    support_foot_gpos = self.mpc_state[support_foot_str]['pos']
 
     # position of next footstep (taken by foot opposing the current support foot) relative to the current foot position
     next_footstep_pos = plan[step_index + 1]['pos']
@@ -555,6 +586,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
       ang_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     
     self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time, scaler=self.footstep_scaler)
+    self.plan = self.node.footstep_planner.plan
     
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:
     '''
@@ -658,7 +690,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     '''
     
     # com_pos and self.node.mpc.h are in the same coordinate systems
-    com_pos = self.node.retrieve_state()['com']['pos']
+    com_pos = self.mpc_state['com']['pos']
     r_ZH  = - self.REWARD_FUNC_CONSTANTS['w_ZH'] * np.abs(com_pos[2] - self.node.mpc.h)
     # TODO: add rewards/penalties on torso
 
@@ -701,22 +733,34 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     self.angle_y = self.angle_y*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_y[1] - range_y[0])) + range_y[0])  #0.0
     self.angle_x = self.angle_x*additive + np.random.choice([-1, 1]) * ((np.random.random() * (range_x[1] - range_x[0])) + range_x[0])  # from 3,4° to 6,8°
-      
+
+    gravity = utils.compute_gravity_vector(angle_x=self.angle_x, angle_y=self.angle_y)
+    self.gravities.append({
+        "timestep": self.current_step,
+        "gravity": gravity,
+        "angle_x": self.angle_x,
+        "angle_y": self.angle_y,
+        "com_pos_at_change": self.mpc_state['com']['pos']
+      })
+
     if apply_gravity:
       self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, self.angle_x, self.angle_y)
-      self.DrawGravityVector(self, self.angle_x, self.angle_y)
+      self.DrawGravity(self.angle_x, self.angle_y)
   
-  def DrawGravityVector(self, angle_x, angle_y):
+  def DrawGravity(self, angle_x=0, angle_y=0):
+    length=0.85
+    gravity = np.array(utils.compute_gravity_vector(angle_x=angle_x, angle_y=angle_y, g=length))
+    self.DrawGravityVector(gravity)
+    
+  
+  def DrawGravityVector(self, gravity):
     if not self.render:
       return
 
     if self.gravity_skel is not None:
         self.node.world.removeSkeleton(self.gravity_skel)
-
-
-    length=0.85
+        
     origin = np.array([0.,0., 2.2])
-    gravity = np.array([-length * np.sin(angle_y), length* np.cos(angle_y) * np.sin(angle_x), -length*np.cos(angle_x)*np.cos(angle_y)])
     utils.DrawArrow(self.node.world, origin+gravity, origin)
 
 

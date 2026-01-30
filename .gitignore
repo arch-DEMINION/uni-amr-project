@@ -4,3 +4,8 @@ venv
 *.log/*
 *.zip
 *.pkl
+plots/
+*.pdf
+*.bsv
+*.csv
+*.log

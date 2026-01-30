@@ -182,3 +182,18 @@ def DrawArrow(world, head, tail, name=f"arrow", color = [0., 1.0, 0., 1.]) -> da
     world.addSkeleton(skel)
 
     return skel
+
+
+# takes a plan formatted by footstep planner, returns a ligher dictionary including only position and angles
+# particularly useful for logging
+def lighten_plan(plan) -> None:
+    new_plan = []
+    for step in plan:
+        new_plan.append({
+            'pos': step['pos'],
+            'ang': step['ang']
+        })
+    return new_plan
+
+def compute_gravity_vector(angle_x=0, angle_y=0, g=9.81):
+    return [-g * np.sin(angle_y), g* np.cos(angle_y) * np.sin(angle_x), -g*np.cos(angle_x)*np.cos(angle_y)]
