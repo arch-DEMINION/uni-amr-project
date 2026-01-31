@@ -202,13 +202,23 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                                             self.current['com']['pos'][2], self.current['com']['vel'][2], self.current['zmp']['pos'][2]]))
         
         #update residual signal
+
+        self.residual.update(x = np.array([self.current['com']['pos'][0], self.current['com']['vel'][0],
+                                                   self.current['com']['pos'][1], self.current['com']['vel'][1],
+                                                   self.current['com']['pos'][2], self.current['com']['vel'][2]]), 
+                                     u = np.array([self.current['zmp']['pos'][0], self.current['zmp']['pos'][1], self.current['zmp']['pos'][2]]),
+                                     t = self.time, 
+                                     )
+        '''
         if self.footstep_planner.get_phase_at_time(self.time) == 'ss':
             if self.footstep_planner.get_current_footstep_from_plan(self.time)['foot_id'] == self.footstep_planner.get_current_footstep_from_plan(self.residual.time)['foot_id']:
                 self.residual.update(x = np.array([self.current['com']['pos'][0], self.current['com']['vel'][0],
                                                    self.current['com']['pos'][1], self.current['com']['vel'][1],
                                                    self.current['com']['pos'][2], self.current['com']['vel'][2]]), 
                                      u = np.array([self.current['zmp']['pos'][0], self.current['zmp']['pos'][1], self.current['zmp']['pos'][2]]),
-                                     t = self.time)
+                                     t = self.time, 
+                                     ) # etah = np.sqrt(-self.world.getGravity()[2] / self.params['h'])
+                #print(self.world.getGravity()[2])
             else:
                 self.residual = residual_dynamics(time = self.time, 
                                                   starting_x = np.array([x_flt[0], x_flt[1], x_flt[3], x_flt[4], x_flt[6], x_flt[7]]),
@@ -216,7 +226,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                                                   etah=self.params['eta'],
                                                   g = self.params['g'])
 
-            
+            '''
         # update current state using kalman filter output
         self.current['com']['pos'][0] = x_flt[0]
         self.current['com']['vel'][0] = x_flt[1]

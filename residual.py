@@ -1,4 +1,5 @@
 import numpy as np
+import csv
 
 class residual_dynamics:
     def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 100, w_size = 2, threshold = 1) -> None:
@@ -45,7 +46,15 @@ class residual_dynamics:
         self.pre_u = self.u
         self.u = u
         self.r_history.append(self.r)
-        print(f"[R]: {self.IsPerturbed()}: {self.sliding_window_mean(self.w_size):0.4f}")
+        filtered = self.sliding_window_mean(self.w_size)
+        print(f"[R]: {self.IsPerturbed()}: {filtered:0.4f}")
+        '''
+        with open('residual_value_forces.csv', 'a', newline='') as csvfile:
+            fieldnames = ['time', 'r']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows([{'time' : self.time * 0.01, 'r' : filtered}])
+        '''
         return self.r
     
     def sliding_window_mean(self, w_size : int = 1) -> float:

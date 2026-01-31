@@ -117,7 +117,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'gravity_x_range' : np.array([0.06, 0.12]) * 1, # [3,4°, 6,8°] * scale
     'gravity_y_range' : np.array([0.06, 0.12]) * 1,
     'gravity_change_prob' : 0 * 0.01, # 1%
-    'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
+    'ext_force_appl_prob': 0.00333 * 30.0,  # 1%
     'force_range': np.array([50, 150]) * 0.3,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
@@ -131,7 +131,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
   REWARD_LOWER_BOUND = -1500
   LEVELING_SYSTEM = {
-    'starting_level'   : 20,
+    'starting_level'   : 0,
     'exp_to_new_level' : 6,
     'exp_gain' : 2,
     'exp_loss' : 1
@@ -590,7 +590,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # try to keep the feet at a proper distance to avoid self collisions
     # penalty for placing the foots to close
     r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
-    # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
+    # bonus for separate foot 5*e^-((|x| - 0.45)/0.2)^2   
     r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
                                  self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
                                  self.REWARD_FUNC_CONSTANTS['w_footstep']) 
@@ -719,8 +719,6 @@ class ISMPC2gym_env_wrapper(gym.Env):
     gravity = np.array([-length * np.sin(angle_y), length* np.cos(angle_y) * np.sin(angle_x), -length*np.cos(angle_x)*np.cos(angle_y)])
     utils.DrawArrow(self.node.world, origin+gravity, origin)
 
-
-      
   def Get_random_force(self, range_f : list[float, float], range_p : list[float, float]) -> None:
     '''
     Method for applying a random force on a random point of the robot at a certain time step
