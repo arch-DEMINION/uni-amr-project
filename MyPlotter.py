@@ -86,13 +86,13 @@ class PlotCallback(BaseCallback):
 
         # from the second episode on, save the last plan of the previous episode
         if ep_step == 0 and episode > 1:
-            self.logger.record("episode", self._episode)
-            self.logger.record("timestep", self._ep_step)
-            self.logger.record("original_plan", None) # empty entry, for proper formatting
-            self.logger.record("mpc_state", self._state)
-            self.logger.record("plan", self._plan)
-            # actually write to file
-            self.logger.dump()
+            # self.logger.record("episode", self._episode)
+            # self.logger.record("timestep", self._ep_step)
+            # self.logger.record("original_plan", None) # empty entry, for proper formatting
+            # self.logger.record("mpc_state", self._state)
+            # self.logger.record("plan", self._plan)
+            # # actually write to file
+            # self.logger.dump()
 
             fig, ax = plt.subplots()
             plt.title("Plan")
@@ -102,8 +102,8 @@ class PlotCallback(BaseCallback):
             foot_size=0.1
             offset = np.array([foot_size, foot_size])
 
-            ax.set_xlim(-foot_size*2, 3)
-            ax.set_ylim(-1.5-foot_size, 1.5+foot_size)
+            ax.set_xlim(-foot_size*2, 1.2)
+            ax.set_ylim(-0.6-foot_size, 0.6+foot_size)
 
             # plot footsteps, red for left, blue for right
             for s in self._plan:
@@ -168,20 +168,21 @@ class PlotCallback(BaseCallback):
         else:
             # any episode, after one step as passed
             if ep_step >= start_step:
-                # always save episode and timestep
-                self.logger.record("episode", self._episode)
-                self.logger.record("timestep", self._ep_step)
+                # # always save episode and timestep
+                # self.logger.record("episode", self._episode)
+                # self.logger.record("timestep", self._ep_step)
 
-                # if first step of new episode, save the original plan
-                if ep_step == start_step:
-                    original_plan = self.training_env.get_attr("original_plan")[0]
-                    self.logger.record("original_plan", original_plan)
+                # # if first step of new episode, save the original plan
+                # if ep_step == start_step:
+                #     original_plan = self.training_env.get_attr("original_plan")[0]
+                #     self.logger.record("original_plan", original_plan)
 
-                # save mpc state. Leave plan entry empty for proper formatting
-                self.logger.record("mpc_state", self._state)
-                self.logger.record("plan", None) # empty entry, for proper formatting
-                # actually write to file
-                self.logger.dump()
+                # # save mpc state. Leave plan entry empty for proper formatting
+                # self.logger.record("mpc_state", self._state)
+                # self.logger.record("plan", None) # empty entry, for proper formatting
+                # # actually write to file
+                # self.logger.dump()
+                pass
             else:
                 self._states = []
 
