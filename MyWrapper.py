@@ -113,6 +113,32 @@ class ISMPC2gym_env_wrapper(gym.Env):
     'footstep_checkpoint' : 3.0  #originally 3.0
   }
 
+
+  AM_REWARD_FUNC_CONSTANTS = {
+          'r_alive' : 3.0,
+      
+             'w_ZH' : 0.1,
+            'w_phi' : 0.1,
+
+        'w_vel_ref':  1.5,
+     'sigma_vel_ref': 0.1,
+     
+          'w_footstep' : 10.0,
+      'sigma_footstep' : 0.15,
+'sigma_footstep_bonus' : 0.2,
+      'distance_bonus' : 0.45,
+
+    'terminated_penalty' : -100.0,
+    'sigma_desired_footstep': 0.1,
+    'omega_desired_footstep': 2.5,
+
+    'action_weight_sw'  : 1.0,
+    'action_weight_ds'  : 1.0,
+    'action_damping' : 0.001,
+    'end_of_plan' : 100.0,
+    'footstep_checkpoint' : 3.0
+  }
+
   PERTURBATION_PARAMETERS = {
     'gravity_x_range' : np.array([0.06, 0.12]) * 1, # [3,4°, 6,8°] * scale
     'gravity_y_range' : np.array([0.06, 0.12]) * 1,
@@ -371,13 +397,14 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.episodes += 1
       #self.Leveling()
 
-    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, trajectory=self.desired_trajectory, get_reference=self.get_ref_node)
+    self.world, self.viewer, self.node = simulation.simulation_setup(self.render_, trajectory=self.desired_trajectory if self.level <= 26 else -1, get_reference=self.get_ref_node)
     # these variables are saved for logging purposes
     self.mpc_state = self.node.retrieve_state()
     self.plan = self.node.footstep_planner.plan
     self.original_plan = self.node.footstep_planner.original_plan
     self.terminated = False
     self.truncated = False
+    self.initial_feet_distance = np.linalg.norm(self.mpc_state['lfoot']['pos'][:3] - self.mpc_state['rfoot']['pos'][:3])
 
     self.is_plot_init = False
 
@@ -607,7 +634,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # termination penalty and alive bonus
     terminated_penalty =  self.REWARD_FUNC_CONSTANTS['terminated_penalty']       if self.solver_status == 'maximum iterations reached' else \
                           self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 0.5 if self.solver_status == 'solved inaccurate'          else \
-                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.solver_status == 'problem non convex'         else 0
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 3.0 if self.solver_status == 'problem non convex'         else \
+                          self.REWARD_FUNC_CONSTANTS['terminated_penalty'] * 5.0 if self.solver_status == 'feet_collision'             else 0
     
     current_reward = 0.0 + terminated_penalty if terminated else \
                            self.REWARD_FUNC_CONSTANTS['r_alive']
@@ -622,10 +650,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
     current_reward += self.R_sw(state, action) if state['remaining_time'] > 0 else self.R_end(state, action)
 
     # try to keep the feet at a proper distance to avoid self collisions
-    # penalty for placing the foots to close
+    # penalty for placing the feet to close
     r_next_footstep = -Ker(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2), self.REWARD_FUNC_CONSTANTS['sigma_footstep'], self.REWARD_FUNC_CONSTANTS['w_footstep'])
     # bonus for separate foot 5*e^((|x| - 0.45)/0.2)^2   
-    r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.REWARD_FUNC_CONSTANTS['distance_bonus'], 
+    r_next_footstep_bonus = Ker(np.abs(np.linalg.norm(state['next_footstep_relpos'][0:2], ord= 2)) - self.initial_feet_distance,
                                  self.REWARD_FUNC_CONSTANTS['sigma_footstep_bonus'], 
                                  self.REWARD_FUNC_CONSTANTS['w_footstep']) 
     current_reward += r_next_footstep + r_next_footstep_bonus
