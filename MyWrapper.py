@@ -84,33 +84,33 @@ class ISMPC2gym_env_wrapper(gym.Env):
   previous_actions : list[ dict[str, float] ]
   previous_rewards : list[ float            ]
 
-  REWARD_FUNC_CONSTANTS = {
+  CLASSIC_REWARD_FUNC_CONSTANTS = {
           'r_alive' : 3.0,
       
              'w_ZH' : 0.1,
             'w_phi' : 0.1,
 
-        'w_vel_ref':  0,  # originally 1.5
+        'w_vel_ref':  1.5,  # originally 1.5
      'sigma_vel_ref': 0.1,
      
          
           'w_L' : 3.5,
           'sigma_L': 0.05,
      
-          'w_footstep' : 0.8,  # originally 10.0
+          'w_footstep' : 10.0,  # originally 10.0
       'sigma_footstep' : 0.15,
 'sigma_footstep_bonus' : 0.2,
-      'distance_bonus' : 0.35,   # originally 0.45
+      'distance_bonus' : 0.45,   # originally 0.45
 
-    'terminated_penalty' : -1000.0,
+    'terminated_penalty' : -300.0,
     'sigma_desired_footstep': 0.1, 
-    'omega_desired_footstep': 0,  #originally 2.5
+    'omega_desired_footstep': 2.5,  #originally 2.5
 
-    'action_weight_sw'  : 4.0,  # originally 1.0
-    'action_weight_ds'  : 4.0,  # originally 1.0
+    'action_weight_sw'  : 1.0,  # originally 1.0
+    'action_weight_ds'  : 1.0,  # originally 1.0
     'action_damping' : 0.001,
-    'end_of_plan' : 1000.0,  # originally 100.0
-    'footstep_checkpoint' : 5.0  #originally 3.0
+    'end_of_plan' : 100.0,  # originally 100.0
+    'footstep_checkpoint' : 3.0  #originally 3.0
   }
 
   PERTURBATION_PARAMETERS = {
@@ -184,6 +184,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
     :param footstep_scaler: Scaler parameter to use in modifying the footstep plan. 0 means only the next footstep is modified, 1 means the whole plan is displaced
     :type footstep_scaler: float
     '''
+
+    self.REWARD_FUNC_CONSTANTS = self.AM_REWARD_FUNC_CONSTANTS if (get_L_reference or get_ref_node) else self.CLASSIC_REWARD_FUNC_CONSTANTS
 
     # init the name state and maximum steps for the simulations then reset the environment
     self.name        = name
