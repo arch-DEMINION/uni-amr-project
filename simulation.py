@@ -28,12 +28,12 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             'h': 0.72,
             'foot_size': 0.1,
             'step_height': 0.02,
-            'ss_duration': 70,
+            'ss_duration': 40,
             'ds_duration': 30,
             'world_time_step': world.getTimeStep(),
             'first_swing': 'rfoot',
             'µ': 0.5,
-            'N': 120, # TO MODIFY originally 250
+            'N': 250, # TO MODIFY originally 250
             'dof': self.hrp4.getNumDofs(),
         }
         self.params['eta'] = np.sqrt(self.params['g'] / self.params['h'])
@@ -94,8 +94,8 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         # initialize footstep planner
         # if trajectory is < 0 pick a random one, except validation ones
-        if trajectory < 0:
-            trajectory = random.randint(0, 6)
+        if trajectory <= 0:
+            trajectory = random.randint(1, 5)
 
         if trajectory == 100:
             trajectory = random.randint(101, 103)
@@ -104,38 +104,44 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             trajectory = 103  # to get always the same reference when getting L_des
 
         match trajectory:
-            case 0:
+            case 1:
                 # on the spot
                 reference = [(0., 0., 0.)] * 10
-            case 1:
-                # forwards, then backwards
-                reference = [(0.1, 0., 0.)] * 10 + [(-0.1, 0., 0.)] * 10
             case 2:
-                # backwards, then forwards
-                reference = [(-0.1, 0., 0.)] * 10 + [(0.1, 0., 0.)] * 10
+                # forwards, then backwards
+                reference = [(0.10, 0., 0.)] * 15 # + [(-0.1, 0., 0.)] * 10
             case 3:
-                # turn on the spot
-                reference = [(0.0, 0., 0.12)] * 25
+                # backwards, then forwards
+                reference = [(-0.10, 0., 0.)] * 15 # + [(0.1, 0., 0.)] * 10
+            # case 3:
+            #     # turn on the spot
+            #     reference = [(0.0, 0., 0.2)] * 40
+            #     self.params['first_swing'] = 'lfoot'
+            # case 4:
+            #     # turn on the spot (other direction)
+            #     reference = [(0.0, 0., -0.2)] * 40
             case 4:
-                # turn on the spot (other direction)
-                reference = [(0.0, 0., -0.12)] * 25
-            case 5:
-                # to the left, the to the right
+                # to the left, then to the right
                 reference = [(0.0, -0.1, 0.)] * 10 + [(0.0, 0.1, 0.)] * 10
-            case 6:
-                # to the right
+            case 5:
+                # to the right, then to the left
                 reference = [(0.0, 0.1, 0.)] * 10 + [(0.0, -0.1, 0.)] * 10
-            # use the following for validation, hence
+                # self.params['first_swing'] = 'lfoot'
+            # use the following for validation, hence they should never be used in training
             case 101:
-                # to the left, the to the right
+                # forward, then to the right
                 reference = [(0.15, 0., 0.)] * 25 + [(0.0, 0.1, 0.)] * 25
             case 102:
-                # to the right
+                # diagonal
                 reference = [(0.12, 0.05, 0.)] * 25
+                # self.params['first_swing'] = 'lfoot'
             case 103:
                 # weird sine like
                 reference = [(0.1, 0., 0.2)] * 5 + [(0.1, 0., -0.1)] * 10 + [(0.1, 0., 0.)] * 10  + [(0., 0., 0.)] * 10 
-        reference += [(0., 0., 0.)]
+                # self.params['first_swing'] = 'lfoot'
+
+
+        reference += [(0., 0., 0.)] * 5
 
         self.plan_skeleton = []
         self.footstep_planner = footstep_planner.FootstepPlanner(
