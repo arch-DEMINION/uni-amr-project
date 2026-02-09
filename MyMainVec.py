@@ -11,6 +11,77 @@ import time
 import numpy as np
 import torch
 import MyPlotter
+from stable_baselines3.common.callbacks import BaseCallback
+class SaveOnLevelling_Callback(BaseCallback):
+    """
+    A custom callback that derives from ``BaseCallback``.
+
+    :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
+    """
+    def __init__(self, vec_env, f_model, f_env, verbose: int = 0):
+        super().__init__(verbose)
+        # Those variables will be accessible in the callback
+        # (they are defined in the base class)
+        # The RL model
+        # self.model = None  # type: BaseAlgorithm
+        # An alias for self.model.get_env(), the environment used for training
+        # self.training_env # type: VecEnv
+        # Number of time the callback was called
+        # self.n_calls = 0  # type: int
+        # num_timesteps = n_envs * n times env.step() was called
+        # self.num_timesteps = 0  # type: int
+        # local and global variables
+        # self.locals = {}  # type: Dict[str, Any]
+        # self.globals = {}  # type: Dict[str, Any]
+        # The logger object, used to report things in the terminal
+        # self.logger # type: stable_baselines3.common.logger.Logger
+        # Sometimes, for event callback, it is useful
+        # to have access to the parent object
+        # self.parent = None  # type: Optional[BaseCallback]
+        self.f_model = f_model
+        self.f_env = f_env
+        self.vec_env = vec_env
+
+    def _on_training_start(self) -> None:
+        """
+        This method is called before the first rollout starts.
+        """
+        self.training_env.model = self.model
+        self.training_env.vec_env = self.vec_env
+        self.training_env.file_model = self.f_model
+        self.training_env.file_env = self.f_env
+
+    def _on_rollout_start(self) -> None:
+        """
+        A rollout is the collection of environment interaction
+        using the current policy.
+        This event is triggered before collecting new samples.
+        """
+        pass
+
+    def _on_step(self) -> bool:
+        """
+        This method will be called by the model after each call to `env.step()`.
+
+        For child callback (of an `EventCallback`), this will be called
+        when the event is triggered.
+
+        :return: If the callback returns False, training is aborted early.
+        """
+        return True
+
+    def _on_rollout_end(self) -> None:
+        """
+        This event is triggered before updating the policy.
+        """
+        pass
+
+    def _on_training_end(self) -> None:
+        """
+        This event is triggered before exiting the `learn()` method.
+        """
+        pass
+
 
 def start_simulation(model_path: str, vecnorm_path: str):
     env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False,render=True,frequency_change_grav=1)
@@ -87,7 +158,7 @@ def main(n_envs = 1, train = True, load = False, filename_model=f"ppo_hrp4_multi
 
         try:
             for i in range(1000):
-                model.learn(total_timesteps=2048*8)
+                model.learn(total_timesteps=2048*8, callback=SaveOnLevelling_Callback(vec_env = vec_env, f_model = filename_model, f_env = filename_env))
                 model.save(filename_model)
                 vec_env.save(filename_env)
                 print(f"last save: ppo_hrp4_multienv" + " @"*20)

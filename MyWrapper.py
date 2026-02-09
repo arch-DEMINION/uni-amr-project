@@ -233,6 +233,11 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.force_bool = force_bool
     self.L_des = []
     self.action_decision = action_decision
+
+    self.model = None
+    self.vec_env = None
+    self.file_model = ''
+    self.file_env = ''
     
     colorama.init()
 
@@ -840,6 +845,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
         if self.end_of_plan_counter >= self.LEVELING_SYSTEM['exp_to_new_level']:
           self.level += 1
           self.end_of_plan_counter = 0
+          
+          if not self.model == None and not self.vec_env == None and not self.file_model == '' and not self.file_env == '': 
+            self.model.save(self.file_model)
+            self.vec_env.save(self.file_env)
           
           print(colored(f'NEW LEVEL: {self.level}', 'yellow')) 
 
