@@ -13,7 +13,7 @@ import timeit
 from math import sin,cos,sqrt
 import random
 import utils as utils
-from residual import residual_dynamics
+#from residual import residual_dynamics
 
 
 class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
@@ -185,14 +185,14 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                                       block_diag(R, R, R), \
                                       block_diag(P, P, P), \
                                       x)
-
+        '''
         # initialize residual 
         self.residual = residual_dynamics(time = 0, 
                                           starting_x=np.array([x[0], x[1], x[3], x[4], x[6], x[7]]),
                                           starting_u=np.array([x[2], x[5], x[8]]),
                                           etah=self.params['eta'], 
                                           g = self.params['g'])
-
+        '''
         # initialize logger and plots
         self.logger = Logger(self.initial)
         
@@ -206,7 +206,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         x_flt, _ = self.kf.update(np.array([self.current['com']['pos'][0], self.current['com']['vel'][0], self.current['zmp']['pos'][0], \
                                             self.current['com']['pos'][1], self.current['com']['vel'][1], self.current['zmp']['pos'][1], \
                                             self.current['com']['pos'][2], self.current['com']['vel'][2], self.current['zmp']['pos'][2]]))
-        
+        '''
         #update residual signal
         if self.footstep_planner.get_phase_at_time(self.time) == 'ss':
             if self.footstep_planner.get_current_footstep_from_plan(self.time)['foot_id'] == self.footstep_planner.get_current_footstep_from_plan(self.residual.time)['foot_id']:
@@ -221,7 +221,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
                                                   starting_u = np.array([x_flt[2], x_flt[5], x_flt[8]]),
                                                   etah=self.params['eta'],
                                                   g = self.params['g'])
-
+        '''
             
         # update current state using kalman filter output
         self.current['com']['pos'][0] = x_flt[0]
