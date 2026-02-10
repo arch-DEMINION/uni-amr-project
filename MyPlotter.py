@@ -5,13 +5,15 @@ import utils
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+import os
+
 class PlotCallback(BaseCallback):
     """
     A custom callback that derives from ``BaseCallback``.
 
     :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
     """
-    def __init__(self, verbose: int = 0):
+    def __init__(self, verbose: int = 0, folder="plots"):
         super().__init__(verbose)
         # Those variables will be accessible in the callback
         # (they are defined in the base class)
@@ -31,6 +33,10 @@ class PlotCallback(BaseCallback):
         # Sometimes, for event callback, it is useful
         # to have access to the parent object
         # self.parent = None  # type: Optional[BaseCallback]
+        self.folder = folder
+
+        if not os.path.exists(self.folder):
+            os.makedirs(self.folder)
 
     def _on_training_start(self) -> None:
         """
@@ -100,10 +106,24 @@ class PlotCallback(BaseCallback):
             plt.ylabel("y")
 
             foot_size=0.1
+            margin = 2*foot_size
             offset = np.array([foot_size, foot_size])
 
-            ax.set_xlim(-foot_size*2, 1.2)
-            ax.set_ylim(-0.6-foot_size, 0.6+foot_size)
+            xrange = self.maxx - self.minx
+            xmid = (self.maxx+self.minx)*0.5
+            yrange = self.maxy - self.miny
+            ymid = (self.maxy+self.miny)*0.5
+
+            if xrange >= yrange:
+                ax.set_xlim(self.minx-margin, self.maxx+margin)
+                ax.set_ylim(ymid-xrange*0.5-margin, ymid+xrange*0.5+margin)
+            else:
+                ax.set_ylim(self.miny-margin, self.maxy+margin)
+                ax.set_xlim(xmid-yrange*0.5-margin, xmid+yrange*0.5+margin)
+
+            # ax.set_xlim(-foot_size*2, 1.2)
+            # # ax.set_xlim(-0.6-foot_size, 0.6+foot_size)
+            # ax.set_ylim(-0.6-foot_size, 0.6+foot_size)
 
             # plot footsteps, red for left, blue for right
             for s in self._plan:
@@ -149,19 +169,19 @@ class PlotCallback(BaseCallback):
                 ax.add_patch(p)
 
             # plot gravity vectors, as seen from above, slightly below the com position when the change happened
-            offset = -1.0
-            for f in self._gravities:
-                x = f['com_pos_at_change'][0]
-                y = f['com_pos_at_change'][1]
-                dx = f['gravity'][0]
-                dy = f['gravity'][1]
-                p = patches.Arrow(x,y+offset,dx,dy,width=0.12)
-                ax.add_patch(p)
+            # offset = -1.0
+            # for f in self._gravities:
+            #     x = f['com_pos_at_change'][0]
+            #     y = f['com_pos_at_change'][1]
+            #     dx = f['gravity'][0]
+            #     dy = f['gravity'][1]
+            #     p = patches.Arrow(x,y+offset,dx,dy,width=0.12)
+            #     ax.add_patch(p)
 
             ax.grid(visible=True, which='both', linewidth=1, alpha=0.3)
             # show
             # plt.show()
-            fig.savefig(f"plots/episode{self._episode}.pdf", format="pdf")
+            fig.savefig(f"{self.folder}/episode{self._episode}.pdf", format="pdf", )
 
             # clear stores states for next episode
             self._states = []
@@ -186,6 +206,11 @@ class PlotCallback(BaseCallback):
             else:
                 self._states = []
 
+                self.minx = 0
+                self.miny = 0
+                self.maxx = 0
+                self.maxy = 0
+
         # save plan and state of this step. Will be logged next step
         self._plan  = self.training_env.get_attr("plan")[0]
         self._original_plan  = self.training_env.get_attr("original_plan")[0]
@@ -196,6 +221,12 @@ class PlotCallback(BaseCallback):
         self._gravities = self.training_env.get_attr("gravities")[0]
 
         self._states.append(self._state)
+
+        pos = self._state['com']['pos']
+        if pos[0] < self.minx: self.minx=pos[0]
+        if pos[1] < self.miny: self.miny=pos[1]
+        if pos[0] > self.maxx: self.maxx=pos[0]
+        if pos[1] > self.maxy: self.maxy=pos[1]
 
         return True
 
