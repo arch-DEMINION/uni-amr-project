@@ -106,17 +106,26 @@ class FootstepPlanner:
         '''
         
         # start one index later to avoid shifting the plan on the foot currently on the ground
-        starting_index = self.get_step_index_at_time(time) + 1
+        step = self.get_step_index_at_time(time)
+        starting_index = step + 1
 
         if self.get_phase_at_time(time) == 'ds':
            starting_index += 1
         
+        # record total theoretical displacement
         self.plan[starting_index]['disp_pos'] += D_pos
         self.plan[starting_index]['disp_ang'] += D_ang
 
+        # if its above the maximum admitted, prevent changes in this step
         if np.abs(self.plan[starting_index]['disp_pos'][0]) >= self.plan[starting_index]['max_disp_pos'][0]: D_pos[0] = 0.0
         if np.abs(self.plan[starting_index]['disp_pos'][1]) >= self.plan[starting_index]['max_disp_pos'][1]: D_pos[1] = 0.0
         if np.abs(self.plan[starting_index]['disp_ang'][2]) >= self.plan[starting_index]['max_disp_ang'][2]: D_ang[2] = 0.0
+
+        # or if the total displacement would be too close to the previous foot, prevent changes in this step
+        if np.abs(self.plan[starting_index]['disp_pos'][0] + self.plan[starting_index]['pos'][0] - self.plan[step]['pos'][0]) <= 0.15: D_pos[0] = 0.0
+        if np.abs(self.plan[starting_index]['disp_pos'][1] + self.plan[starting_index]['pos'][1] - self.plan[step]['pos'][1]) <= 0.15: D_pos[1] = 0.0
+        
+        # print(self.plan[starting_index]['pos'], self.plan[starting_index]['disp_pos'] + self.plan[starting_index]['pos'])
 
         if D_pos[0] == 0 and D_pos[1] == 0 and D_ang[2] == 0: return 
         
@@ -125,7 +134,8 @@ class FootstepPlanner:
             self.plan[i]['ang'] += D_ang
             
             D_pos *= scaler
-            D_ang *= scaler
+            D_ang *= scaler        
+
 
     def get_current_footstep_from_plan(self, time : float) -> dict:
         '''
