@@ -295,12 +295,15 @@ class ISMPC2gym_env_wrapper(gym.Env):
       self.ApplyAction(action_dict)
 
       # simulate robot and environment using dartpy
-      for i in range(self.mpc_frequency):        
-        self.node.customPreStep()
-        self.world.step()
-        self.current_MPC_step += 1
-        self.solver_status = self.node.mpc.sol.stats()["return_status"]  
-        self.render()
+      while True:
+        for i in range(self.mpc_frequency):        
+          self.node.customPreStep()
+          self.world.step()
+          self.current_MPC_step += 1
+          self.solver_status = self.node.mpc.sol.stats()["return_status"]  
+          self.render()
+        
+        if self.node.residual.IsPerturbed(): break
       
       
       # MPC state, for logging purposes
@@ -335,8 +338,13 @@ class ISMPC2gym_env_wrapper(gym.Env):
         
       
     except Exception as e:
-      self.solver_status = str(e).split("'")[-2]
-      print(colored(f"Failure during simulation: {self.solver_status}", self.COLOR_CODE['exception']))
+      e_list = str(e).split("'")
+      if len(e_list) > 1:
+        self.solver_status = str(e).split("'")[-2]
+        print(colored(f"Failure during simulation: {self.solver_status}", self.COLOR_CODE['exception']))
+      else:
+        print(colored(f"Failure during simulation: {e}", self.COLOR_CODE['exception']))
+        self.solver_status = ''
       terminated = True
 
     # collect the state and the reward
@@ -829,7 +837,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     return random_force, random_point, random_body, random_body_name
   
   def end_of_plan_condition(self):
-    return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 3)
+    return self.node.footstep_planner.get_step_index_at_time(self.node.time) >= (len(self.node.footstep_planner.plan) - 5)
   
   def Leveling(self) -> None:
     if not self.curriculum_learning:

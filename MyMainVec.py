@@ -100,4 +100,4 @@ def main(n_envs = 1, train = True, load = False, filename_model=f"ppo_hrp4_multi
     start_simulation(model_path=filename_model,vecnorm_path=filename_env)    
 
 if __name__ == "__main__":
-    main(train=True, load=False, filename_model=f"ppo_hrp4_nextfootstep_curriculum2.zip", filename_env=f"ppo_hrp4_nextfootstep_curriculum2.pkl", curriculum_learning=True, n_envs=16, footstep_scaler=1., desired_trajectory=1)   
+    main(train=True, load=False, filename_model=f"ppo_hrp4_nextfootstep_curriculum2.zip", filename_env=f"ppo_hrp4_nextfootstep_curriculum2.pkl", curriculum_learning=True, n_envs=8, footstep_scaler=0.9, desired_trajectory=1)   
