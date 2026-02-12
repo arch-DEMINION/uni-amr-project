@@ -182,7 +182,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                force_bool : float =1.0,
                get_L_reference : bool = False,
                get_ref_node :bool= False,
-               action_decision : bool = False):
+               action_decision : bool = False,
+               trainable_scaling : bool = False):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -233,6 +234,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.force_bool = force_bool
     self.L_des = []
     self.action_decision = action_decision
+    self.trainable_scaling = trainable_scaling
+    self.min_scaler = 0.75
+    self.max_scaler = 1.0
     
     colorama.init()
 
@@ -245,8 +249,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # size of the observation and action spaces
     self.obs_size = len(state) # automatically take the length of the state
 
-    if self.action_decision:
+    if self.action_decision or self.trainable_scaling:
         action_size = 4 # the action should be the displacement alog x y and angular, and discrete decision if act or not: [Dx, Dy, Dtheta, act]
+                        # if trainable_scaling: [Dx, Dy, Dtheta, Scaling]
     else:
         action_size = 3 # the action should be the displacement alog x y and angular: [Dx, Dy, Dtheta]
 
@@ -410,7 +415,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
     # reset the lists that store the previous states and actions useful for computing the rewards
     self.previous_states  = []
-    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'act':1.0, 'list' : np.array([0, 0, 0,1 ])}]
+    self.previous_actions = [ {'Dx' : 0., 'Dy' : 0., 'Dth': 0., 'act':1.0, 'Scaling': self.footstep_scaler, 'list' : np.array([0, 0, 0,1 , self.footstep_scaler])}] 
     self.previous_rewards = []
 
     self.forces = []
@@ -582,8 +587,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
                    'Dy'   : action[1],
                    'Dth'  : action[2],
                    'act'  : 1.0 if  not self.action_decision else act,
-                   'list' : action}
-
+                   'Scaling': action[3] if self.trainable_scaling else self.footstep_scaler,
+                   'list' : action} 
+  
     # add the current action dict to the list of previous actions
     self.previous_actions.append(action_dict)
 
@@ -608,13 +614,16 @@ class ISMPC2gym_env_wrapper(gym.Env):
     pos_displacement = np.array([action_dict['Dx'] * cos(z_support_footstep) - action_dict['Dy'] * sin(z_support_footstep),\
                                  action_dict['Dx'] * sin(z_support_footstep) + action_dict['Dy'] * cos(z_support_footstep), 0.0])*act
     ang_displacement = np.array([0.0, 0.0, action_dict['Dth']])* act
+    
+    if self.trainable_scaling:
+      self.footstep_scaler = num_to_range(action_dict['Scaling'], self.action_space.low[3], self.action_space.high[3], self.min_scaler, self.max_scaler)
 
     # scale if is in ss and time is running out
     if self.node.footstep_planner.get_phase_at_time(self.node.time) == 'ss':
       pos_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
       ang_displacement *= self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time)
     
-    self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time, scaler=self.footstep_scaler)
+    self.node.footstep_planner.modify_plan(pos_displacement, ang_displacement, self.node.time, scaler=self.footstep_scaler) 
     self.plan = self.node.footstep_planner.plan
     
   def GetReward(self, state : dict[str, any], action : dict[str, float], terminated : bool) -> float:

@@ -87,6 +87,12 @@ class Ismpc:
     self.opt.set_value(self.zmp_z_mid_param, mc_z)
 
     self.sol = self.opt.solve()
+    '''
+    try:
+      self.sol = self.opt.solve()
+    except RuntimeError:
+        self.sol = self.opt.debug
+    '''
     self.x = self.sol.value(self.X[:,1])
     self.u = self.sol.value(self.U[:,0])
 

@@ -31,9 +31,9 @@ def start_simulation(model_path: str, vecnorm_path: str):
     env.UpdatePlot()
     input("finished")
     
-def main(n_envs = 1, train = True, load = False, filename_model=f"ppo_hrp4_multienv.zip", filename_env=f"vec_normalized.pkl", desired_trajectory=100, footstep_scaler=0.9, catch_reference=False, action_decision = False, curriculum_learning=False) -> None:
+def main(n_envs = 1, train = True, load = False, filename_model=f"ppo_hrp4_multienv.zip", filename_env=f"vec_normalized.pkl", desired_trajectory=100, footstep_scaler=0.9, catch_reference=False, action_decision = False, curriculum_learning=False, trainable_scaling=False) -> None:
     
-    vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs, env_kwargs={"verbose": False, "render": n_envs == 1, "frequency_change_grav" : 1, "desired_trajectory": desired_trajectory, "curriculum_learning": curriculum_learning, "footstep_scaler": footstep_scaler, "get_L_reference" : catch_reference,  "get_ref_node" : catch_reference, "action_decision": action_decision}, vec_env_cls=SubprocVecEnv)
+    vec_env = make_vec_env(MyWrapper.ISMPC2gym_env_wrapper, n_envs, env_kwargs={"verbose": False, "render": n_envs == 1, "frequency_change_grav" : 1, "desired_trajectory": desired_trajectory, "curriculum_learning": curriculum_learning, "footstep_scaler": footstep_scaler, "get_L_reference" : catch_reference,  "get_ref_node" : catch_reference, "action_decision": action_decision, "trainable_scaling": trainable_scaling}, vec_env_cls=SubprocVecEnv)
     vec_env = VecFrameStack(vec_env, n_stack=4)
     
     # for new environment
@@ -42,7 +42,8 @@ def main(n_envs = 1, train = True, load = False, filename_model=f"ppo_hrp4_multi
         model = PPO.load(filename_model, vec_env)
     else:
         vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=1000.0, clip_reward=50_000)
-        model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2)
+        policy_kwargs = dict(trainable_scaling=trainable_scaling,action_decision=action_decision)
+        model = PPO(NoBiasActionBiasACPolicy, vec_env, verbose=1, device="cpu", n_steps=64, ent_coef=0.01, learning_rate=1e-3, n_epochs=2, policy_kwargs=policy_kwargs)
         
     if catch_reference:
         
