@@ -448,7 +448,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     
     # eventually change the gravity
     if (self.episodes % self.frequency_change_of_grav) == 0 and self.grav_bool > 0.0:
-      self.ChangeGravity(self.PERTURBATION_PARAMETERS['gravity_x_range'], self.PERTURBATION_PARAMETERS['gravity_x_range'], apply_gravity=False)
+      self.ChangeGravity(self.PERTURBATION_PARAMETERS['gravity_x_range'], self.PERTURBATION_PARAMETERS['gravity_y_range'], apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
 
     # restore the perturbations
