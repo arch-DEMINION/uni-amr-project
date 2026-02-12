@@ -33,7 +33,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             'world_time_step': world.getTimeStep(),
             'first_swing': 'rfoot',
             'µ': 0.5,
-            'N': 250, # TO MODIFY originally 250
+            'N': 150, # TO MODIFY originally 250
             'dof': self.hrp4.getNumDofs(),
         }
         self.params['eta'] = np.sqrt(self.params['g'] / self.params['h'])
@@ -122,18 +122,18 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
             #     reference = [(0.0, 0., -0.2)] * 40
             case 4:
                 # to the left, then to the right
-                reference = [(0.0, -0.1, 0.)] * 10 + [(0.0, 0.1, 0.)] * 10
+                reference = [(0.0, -0.1, 0.)] * 15 + [(0.0, 0.1, 0.)] * 15
             case 5:
                 # to the right, then to the left
-                reference = [(0.0, 0.1, 0.)] * 10 + [(0.0, -0.1, 0.)] * 10
+                reference = [(0.0, 0.1, 0.)] * 15 + [(0.0, -0.1, 0.)] * 15
                 # self.params['first_swing'] = 'lfoot'
             # use the following for validation, hence they should never be used in training
             case 101:
                 # forward, then to the right
-                reference = [(0.15, 0., 0.)] * 25 + [(0.0, 0.1, 0.)] * 25
+                reference = [(0.15, 0., 0.)] * 15 + [(0.0, 0.1, 0.)] * 15
             case 102:
                 # diagonal
-                reference = [(0.12, 0.05, 0.)] * 25
+                reference = [(0.12, 0.05, 0.)] * 20
                 # self.params['first_swing'] = 'lfoot'
             case 103:
                 # weird sine like
