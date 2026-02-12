@@ -725,7 +725,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # TODO: add rewards/penalties on torso
 
     # penalty for large displacements near the end of the swing phase
-    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_sw']*np.dot(action['list'][::2], action['list'][::2]) / \
+    action_penalty = -self.REWARD_FUNC_CONSTANTS['action_weight_sw']*np.dot(action['list'][:3], action['list'][:3]) / \
                      (self.node.footstep_planner.get_normalized_remaining_time_in_swing(self.node.time) + \
                       self.REWARD_FUNC_CONSTANTS['action_damping'])
                       
