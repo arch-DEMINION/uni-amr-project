@@ -45,7 +45,8 @@ class residual_dynamics:
         self.pre_u = self.u
         self.u = u
         self.r_history.append(self.r)
-        print(f"[R]: {self.IsPerturbed()}: {self.sliding_window_mean(self.w_size):0.4f}")
+        sl_w_mean_out = self.sliding_window_mean(self.w_size)
+        #print(f"[R]: {self.IsPerturbed()}: {sl_w_mean_out:0.4f}")
         return self.r
     
     def sliding_window_mean(self, w_size : int = 1) -> float:

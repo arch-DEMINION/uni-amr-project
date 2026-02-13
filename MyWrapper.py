@@ -157,7 +157,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
   REWARD_LOWER_BOUND = -1500
   LEVELING_SYSTEM = {
-    'starting_level'   : 20,
+    'starting_level'   : 26,
     'exp_to_new_level' : 6,
     'exp_gain' : 2,
     'exp_loss' : 1
@@ -183,7 +183,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                get_L_reference : bool = False,
                get_ref_node :bool= False,
                action_decision : bool = False,
-               trainable_scaling : bool = False):
+               trainable_scaling : bool = False,
+               residual_active : bool = False):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -237,6 +238,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.trainable_scaling = trainable_scaling
     self.min_scaler = 0.75
     self.max_scaler = 1.0
+    self.residual_active = residual_active
     
     colorama.init()
 
@@ -297,46 +299,51 @@ class ISMPC2gym_env_wrapper(gym.Env):
       # take a step in to the environment
       starting_step = self.node.footstep_planner.get_step_index_at_time(self.node.time) # remember the starting step
       start_time = self.node.time
+
       self.ApplyAction(action_dict)
 
-      # simulate robot and environment using dartpy
-      for i in range(self.mpc_frequency):        
-        self.node.customPreStep()
-        self.world.step()
-        self.current_MPC_step += 1
-        self.solver_status = self.node.mpc.sol.stats()["return_status"]  
-        self.render()
-      
-      
-      # MPC state, for logging purposes
-      self.mpc_state = self.node.retrieve_state()
+      while True: # loop while the environment is perturbed --> sllf.node.residual.IsPerturbed()
+        # simulate robot and environment using dartpy
+        for i in range(self.mpc_frequency):        
+          self.node.customPreStep()
+          self.world.step()
+          self.current_MPC_step += 1
+          self.solver_status = self.node.mpc.sol.stats()["return_status"]  
+          self.render()
+        
+        
+        # MPC state, for logging purposes
+        self.mpc_state = self.node.retrieve_state()
 
-      # apply the forces 
-      if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob'] * self.force_bool:
-        random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETERS['force_range'], self.PERTURBATION_PARAMETERS['CoM_offset_range'])
+        # apply the forces 
+        if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob'] * self.force_bool:
+          random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETERS['force_range'], self.PERTURBATION_PARAMETERS['CoM_offset_range'])
 
 
-        random_body.addExtForce(random_force, random_point, True)
-        W = random_body.getWorldTransform().matrix()
-        p = (W@np.concatenate((random_point, np.ones(1))))[:3]
-        if self.force_skel is not None:
-          self.node.world.removeSkeleton(self.force_skel)
+          random_body.addExtForce(random_force, random_point, True)
+          W = random_body.getWorldTransform().matrix()
+          p = (W@np.concatenate((random_point, np.ones(1))))[:3]
+          if self.force_skel is not None:
+            self.node.world.removeSkeleton(self.force_skel)
 
-        head = p
-        tail = 0.01*(p-random_force)
-        self.force_skel = utils.DrawArrow(self.node.world, head=head, tail=tail, name="force")
+          head = p
+          tail = 0.01*(p-random_force)
+          self.force_skel = utils.DrawArrow(self.node.world, head=head, tail=tail, name="force")
 
-        self.forces.append({
-          "timestep": self.current_step,
-          "force": random_force,
-          "point_world": p,
-          "arrow_head": head,
-          "arrow_tail": tail
-        })
+          self.forces.append({
+            "timestep": self.current_step,
+            "force": random_force,
+            "point_world": p,
+            "arrow_head": head,
+            "arrow_tail": tail
+          })
 
-        print(colored(f"\nApplied force: {random_force} at point {p} ({random_body_name}) \n", self.COLOR_CODE['forces']))
-        self.world.step()
-        self.render()
+          print(colored(f"\nApplied force: {random_force} at point {p} ({random_body_name}) \n", self.COLOR_CODE['forces']))
+          self.world.step()
+          self.render()
+        
+        # out of the cycle only if the environment is perturbed
+        if self.node.residual.IsPerturbed() or self.end_of_plan_condition() or not self.residual_active: break
         
       
     except Exception as e:
