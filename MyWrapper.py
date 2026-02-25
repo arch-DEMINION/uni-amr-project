@@ -17,6 +17,7 @@ import random
 from logger import Logger
 import utils
 import math
+import csv
 
 import simulation
 
@@ -140,10 +141,10 @@ class ISMPC2gym_env_wrapper(gym.Env):
   }
 
   PERTURBATION_PARAMETERS = {
-    'gravity_x_range' : np.array([0.06, 0.12]) * 1, # [3,4°, 6,8°] * scale
-    'gravity_y_range' : np.array([0.06, 0.12]) * 1,
+    'gravity_x_range' : np.array([0.06, 0.12]) * 0, # [3,4°, 6,8°] * scale
+    'gravity_y_range' : np.array([0.06, 0.12]) * 0,
     'gravity_change_prob' : 0 * 0.01, # 1%
-    'ext_force_appl_prob': 0.00333 * 3.0,  # 1%
+    'ext_force_appl_prob': 0.00333 * 0.0,  # 1%
     'force_range': np.array([50, 150]) * 0.3,   # Newton
     'CoM_offset_range': np.array([0.001, 0.05]) # meters from the CoM of the body
   }
@@ -184,7 +185,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                get_ref_node :bool= False,
                action_decision : bool = False,
                trainable_scaling : bool = False,
-               residual_active : bool = False):
+               residual_active : bool = False,
+               test_forces = []):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -239,6 +241,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.min_scaler = 0.75
     self.max_scaler = 1.0
     self.residual_active = residual_active
+    self.test_forces = test_forces
+    self.test_force_index = 0
+    self.test_force_applied_this_episode = False
     
     colorama.init()
 
@@ -315,10 +320,21 @@ class ISMPC2gym_env_wrapper(gym.Env):
         # MPC state, for logging purposes
         self.mpc_state = self.node.retrieve_state()
 
+        # apply scheduled force
+        # force is at the start of new step
+        if self.test_forces[self.test_force_index]['step'] == starting_step and starting_step <= self.test_forces[self.test_force_index]['end_step']: # and not self.test_force_applied_this_episode:
+          # forces always applied to the torso
+          body = self.node.torso
+          force = self.test_forces[self.test_force_index]['force'] * self.test_forces[self.test_force_index]['direction']
+          body.addExtForce(force, np.zeros([3,1]), True)
+          print(colored(f"\nApplied force: {self.test_force_index} {force} at ({body}) \n", self.COLOR_CODE['forces']))
+
+        # if starting_step > self.test_forces[self.test]['end_step']:
+        #   self.test_force_applied_this_episode = True
+
         # apply the forces 
         if np.random.random() < self.PERTURBATION_PARAMETERS['ext_force_appl_prob'] * self.force_bool:
           random_force, random_point, random_body, random_body_name = self.Get_random_force(self.PERTURBATION_PARAMETERS['force_range'], self.PERTURBATION_PARAMETERS['CoM_offset_range'])
-
 
           random_body.addExtForce(random_force, random_point, True)
           W = random_body.getWorldTransform().matrix()
@@ -371,9 +387,22 @@ class ISMPC2gym_env_wrapper(gym.Env):
     truncated = self.current_step > self.max_steps or self.end_of_plan_condition()
     self.truncated = truncated
     self.terminated = terminated
-    
+
     if terminated or truncated:
-        print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['reward']))
+      self.test_forces[self.test_force_index]['success'][self.test_forces[self.test_force_index]['times']-1] = False if terminated else True
+      self.test_forces[self.test_force_index]['times'] -= 1
+
+      if self.test_forces[self.test_force_index]['times'] <= 0:
+        self.test_force_index += 1
+
+      if self.test_force_index == len(self.test_forces):
+        print("Done with test forces")
+        with open("test_forces_result.csv", "w", newline="") as f:
+          w = csv.DictWriter(f, self.test_forces[0].keys())
+          w.writeheader()
+          w.writerows(self.test_forces)
+          
+      print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['reward']))
     
     # log and plot
     if self.show_plot:
@@ -417,6 +446,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.terminated = False
     self.truncated = False
     self.initial_feet_distance = np.linalg.norm(self.mpc_state['lfoot']['pos'][:3] - self.mpc_state['rfoot']['pos'][:3])
+    self.test_force_applied_this_episode = False
 
     self.is_plot_init = False
 

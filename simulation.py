@@ -195,6 +195,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
 
         # initialize logger and plots
         self.logger = Logger(self.initial)
+        self.RenderFootsteps()
         
     def customPreStep(self):
         # create current and desired states
@@ -281,6 +282,7 @@ class Hrp4Controller(dart.gui.osg.RealTimeWorldNode):
         # self.logger.update_plot(self.time)
 
         self.time += 1
+        self.RenderFootsteps()
 
     def compute_angular_momentum(self, pivot=np.zeros(3)):
         L = np.zeros(3)
@@ -462,10 +464,10 @@ def simulation_setup(render = True, angle_x = 0.0, angle_y = 0.0, trajectory=-1,
 
 if __name__ == "__main__":
     render = True
-    world, viewer, node = simulation_setup(render=render, trajectory=103)
+    world, viewer, node = simulation_setup(render=render, trajectory=2, angle_x=0.06, angle_y=0.01)
     node.setTargetRealTimeFactor(10) # speed up the visualization by 10x
 
-    print(node.footstep_planner.plan)
+    # print(node.footstep_planner.plan)
 
     if render:
         try: # ugly: catch footstep generation continuing beyond plan's end
@@ -483,7 +485,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
 
-    node.logger.update_plot(node.time)
+    # node.logger.update_plot(node.time)
     input()
 
 

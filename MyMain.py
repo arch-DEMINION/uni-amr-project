@@ -11,10 +11,11 @@ import os
 from stable_baselines3.common.logger import Logger
 import MyLogger
 import MyPlotter
+import test_forces
 
 def main(train = False, load = False, custom_action = True, filename_model="", filename_env="", footstep_scaler=0.9, desired_trajectory=100) -> None:
     
-    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1, footstep_scaler=footstep_scaler, desired_trajectory=desired_trajectory)
+    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1, footstep_scaler=footstep_scaler, desired_trajectory=desired_trajectory, test_forces=test_forces.forces)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, n_stack=4)
     
@@ -33,9 +34,9 @@ def main(train = False, load = False, custom_action = True, filename_model="", f
     if train:
         print("start training")
         for _ in range(10):
-            # model.learn(total_timesteps=102400, callback=MyPlotter.PlotCallback(folder=f"nominal_plots_traj{desired_trajectory}_gravity_horizon100"))
+            # model.learn(total_timesteps=102400, callback=MyPlotter.PlotCallback(folder=f"nominal_plots_traj{desired_trajectory}_gravity_horizon100_noforces"))
             # model.learn(total_timesteps=102400, callback=MyPlotter.PlotCallback(folder=f"{filename_model}_plots_traj{desired_trajectory}_gravity_horizon150_inclined"))
-            model.learn(total_timesteps=1024)
+            # model.learn(total_timesteps=1024)
             # model.save('ppo_hrp4')
             # env.save("env_normalized.pkl")
             print('saved' + ' @'*20)
@@ -48,7 +49,7 @@ def main(train = False, load = False, custom_action = True, filename_model="", f
         print(f"simulation #{i}")
         s = env.reset()
 
-        for _ in range(1500):
+        for _ in range(50000):
             
             if custom_action: action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
             else: action, _states = model.predict(s, deterministic=True)
@@ -64,4 +65,4 @@ def main(train = False, load = False, custom_action = True, filename_model="", f
 
 if __name__ == "__main__":
 
-    main(train = True, load = True, custom_action = True, filename_model="ppo_hrp4_scaled09_curriculum2_footdistance2.zip", filename_env="ppo_hrp4_scaled09_curriculum2_footdistance2.pkl", footstep_scaler=0.9, desired_trajectory=101)
+    main(train = False, load = True, custom_action = False, filename_model="models/ppo_hrp4_scaled09_curriculum2_footdistance2.zip", filename_env="models/ppo_hrp4_scaled09_curriculum2_footdistance2.pkl", footstep_scaler=0.9, desired_trajectory=2)
