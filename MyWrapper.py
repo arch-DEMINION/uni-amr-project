@@ -186,7 +186,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
                action_decision : bool = False,
                trainable_scaling : bool = False,
                residual_active : bool = False,
-               test_forces = []):
+               test_forces = [],
+               test_gravity = []):
     '''
     Class that wrap gymnasium environment for taking steps in to a dartpy simulation defined in \"simulation.py\"
     
@@ -242,7 +243,9 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.max_scaler = 1.0
     self.residual_active = residual_active
     self.test_forces = test_forces
+    self.test_gravity = test_gravity
     self.test_force_index = 0
+    self.test_gravity_index = 0
     self.test_force_applied_this_episode = False
     
     colorama.init()
@@ -322,7 +325,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
         # apply scheduled force
         # force is at the start of new step
-        if self.test_forces[self.test_force_index]['step'] == starting_step and starting_step <= self.test_forces[self.test_force_index]['end_step']: # and not self.test_force_applied_this_episode:
+        if len(self.test_forces) > 0 and self.test_forces[self.test_force_index]['step'] >= starting_step and starting_step <= self.test_forces[self.test_force_index]['end_step']: # and not self.test_force_applied_this_episode:
           # forces always applied to the torso
           body = self.node.torso
           force = self.test_forces[self.test_force_index]['force'] * self.test_forces[self.test_force_index]['direction']
@@ -389,18 +392,44 @@ class ISMPC2gym_env_wrapper(gym.Env):
     self.terminated = terminated
 
     if terminated or truncated:
-      self.test_forces[self.test_force_index]['success'][self.test_forces[self.test_force_index]['times']-1] = False if terminated else True
-      self.test_forces[self.test_force_index]['times'] -= 1
+      if len(self.test_forces) > 0:
+        # move test forces one index over
+        # the success array is filled back to front. Easier than keeping track of max. tries and directly using 'times' as a counter
+        # Afterwards how many times a test has been repeated can be retrieved by the length of the success array
+        self.test_forces[self.test_force_index]['success'][self.test_forces[self.test_force_index]['times']-1] = False if terminated else True
+        self.test_forces[self.test_force_index]['times'] -= 1
 
-      if self.test_forces[self.test_force_index]['times'] <= 0:
-        self.test_force_index += 1
+        if self.test_forces[self.test_force_index]['times'] <= 0:
+          self.test_force_index += 1
 
-      if self.test_force_index == len(self.test_forces):
-        print("Done with test forces")
-        with open("test_forces_result.csv", "w", newline="") as f:
-          w = csv.DictWriter(f, self.test_forces[0].keys())
-          w.writeheader()
-          w.writerows(self.test_forces)
+        # write
+        if self.test_force_index == len(self.test_forces):
+          print("Done with test forces")
+          with open("test_forces_result.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, self.test_forces[0].keys())
+            w.writeheader()
+            w.writerows(self.test_forces)
+
+      # repeat for gravity
+      if len(self.test_gravity) > 0:
+        # move test gravity one index over
+        # the success array is filled back to front. Easier than keeping track of max. tries and directly using 'times' as a counter
+        # Afterwards how many times a test has been repeated can be retrieved by the length of the success array
+        self.test_gravity[self.test_gravity_index]['success'][self.test_gravity[self.test_gravity_index]['times']-1] = False if terminated else True
+        self.test_gravity[self.test_gravity_index]['stop_step'][self.test_gravity[self.test_gravity_index]['times']-1] = self.step
+        self.test_gravity[self.test_gravity_index]['times'] -= 1
+
+        if self.test_gravity[self.test_gravity_index]['times'] <= 0:
+          self.test_gravity_index += 1
+
+        # write
+        if self.test_gravity_index == len(self.test_gravity):
+          print("Done with test gravity")
+          with open("test_gravity_result.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, self.test_gravity[0].keys())
+            w.writeheader()
+            w.writerows(self.test_gravity)
+      # move test gravity once index over
           
       print(colored(f"Total Reward of the episode: {np.sum(self.previous_rewards):0.3f} | (x, y): ({self.angle_x:0.4f}, {self.angle_y:0.4f})", self.COLOR_CODE['reward']))
     
@@ -491,6 +520,12 @@ class ISMPC2gym_env_wrapper(gym.Env):
     # eventually change the gravity
     if (self.episodes % self.frequency_change_of_grav) == 0 and self.grav_bool > 0.0:
       self.ChangeGravity(self.PERTURBATION_PARAMETERS['gravity_x_range'], self.PERTURBATION_PARAMETERS['gravity_y_range'], apply_gravity=False)
+      self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
+    # or overwrite any change with test
+    if len(self.test_gravity) > 0:
+      ax = self.test_gravity[self.test_gravity_index]['value'][0]
+      ay = self.test_gravity[self.test_gravity_index]['value'][1]
+      self.ChangeGravity([ax, ax], [ay, ay], apply_gravity=False)
       self.world.setGravity(utils.decompose_gravity(self.angle_x, self.angle_y))
 
     # restore the perturbations

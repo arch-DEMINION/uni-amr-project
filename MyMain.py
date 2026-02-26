@@ -11,11 +11,12 @@ import os
 from stable_baselines3.common.logger import Logger
 import MyLogger
 import MyPlotter
+import test_gravity
 import test_forces
 
 def main(train = False, load = False, custom_action = True, filename_model="", filename_env="", footstep_scaler=0.9, desired_trajectory=100) -> None:
     
-    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1, footstep_scaler=footstep_scaler, desired_trajectory=desired_trajectory, test_forces=test_forces.forces)
+    env = MyWrapper.ISMPC2gym_env_wrapper(verbose=False, render=True, max_step=500, frequency_change_grav=1, footstep_scaler=footstep_scaler, desired_trajectory=desired_trajectory, test_forces=[], test_gravity=test_gravity.gravity)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, n_stack=4)
     
@@ -52,7 +53,7 @@ def main(train = False, load = False, custom_action = True, filename_model="", f
         for _ in range(50000):
             
             if custom_action: action = np.array([[0.0, 0.0, 0.0]]) # send action just to make the robot going forward
-            else: action, _states = model.predict(s, deterministic=True)
+            else: action, _states = model.predict(s, deterministic=False)
             s, r, done, info = env.step(action)
 
             #if done: break
@@ -65,4 +66,4 @@ def main(train = False, load = False, custom_action = True, filename_model="", f
 
 if __name__ == "__main__":
 
-    main(train = False, load = True, custom_action = False, filename_model="models/ppo_hrp4_scaled09_curriculum2_footdistance2.zip", filename_env="models/ppo_hrp4_scaled09_curriculum2_footdistance2.pkl", footstep_scaler=0.9, desired_trajectory=2)
+    main(train = False, load = True, custom_action = True, filename_model="models/ppo_hrp4_scaled09_curriculum2_footdistance2.zip", filename_env="models/ppo_hrp4_scaled09_curriculum2_footdistance2.pkl", footstep_scaler=0.9, desired_trajectory=2)
