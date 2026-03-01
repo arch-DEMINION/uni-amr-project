@@ -158,7 +158,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
   REWARD_LOWER_BOUND = -1500
   LEVELING_SYSTEM = {
-    'starting_level'   : 26,
+    'starting_level'   : 10,
     'exp_to_new_level' : 6,
     'exp_gain' : 2,
     'exp_loss' : 1
@@ -325,7 +325,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
         # apply scheduled force
         # force is at the start of new step
-        if len(self.test_forces) > 0 and self.test_forces[self.test_force_index]['step'] >= starting_step and starting_step <= self.test_forces[self.test_force_index]['end_step']: # and not self.test_force_applied_this_episode:
+        if len(self.test_forces) > 0 and starting_step >= self.test_forces[self.test_force_index]['step'] and starting_step <= self.test_forces[self.test_force_index]['end_step']: # and not self.test_force_applied_this_episode:
           # forces always applied to the torso
           body = self.node.torso
           force = self.test_forces[self.test_force_index]['force'] * self.test_forces[self.test_force_index]['direction']
