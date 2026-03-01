@@ -1,7 +1,7 @@
 import numpy as np
 
 class residual_dynamics:
-    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 100, w_size = 2, threshold = 1) -> None:
+    def __init__(self, time : float = 0, starting_x : np.array = np.zeros(6), starting_u = np.array, etah : float = 1, g: float = 9.81, gain : float = 100, w_size = 2, threshold = 0.1) -> None:
 
         self.time = time
         self.x = starting_x

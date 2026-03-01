@@ -66,4 +66,4 @@ def main(train = False, load = False, custom_action = True, filename_model="", f
 
 if __name__ == "__main__":
 
-    main(train = False, load = True, custom_action = False, filename_model="ppo_hrp4_nextfootstep_curriculum2_footdistance2.zip", filename_env="ppo_hrp4_nextfootstep_curriculum2_footdistance2.pkl", footstep_scaler=0.9, desired_trajectory=2)
+    main(train = False, load = True, custom_action = True, filename_model="ppo_hrp4_nextfootstep_curriculum2_footdistance2.zip", filename_env="ppo_hrp4_nextfootstep_curriculum2_footdistance2.pkl", footstep_scaler=0.9, desired_trajectory=2)

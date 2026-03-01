@@ -185,7 +185,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
                get_ref_node :bool= False,
                action_decision : bool = False,
                trainable_scaling : bool = False,
-               residual_active : bool = False,
+               residual_active : bool = True,
                test_forces = [],
                test_gravity = []):
     '''
@@ -318,6 +318,8 @@ class ISMPC2gym_env_wrapper(gym.Env):
           self.current_MPC_step += 1
           self.solver_status = self.node.mpc.sol.stats()["return_status"]  
           self.render()
+
+          starting_step_ = self.node.footstep_planner.get_step_index_at_time(self.node.time) # remember the starting step
         
         
         # MPC state, for logging purposes
@@ -325,7 +327,7 @@ class ISMPC2gym_env_wrapper(gym.Env):
 
         # apply scheduled force
         # force is at the start of new step
-        if len(self.test_forces) > 0 and starting_step >= self.test_forces[self.test_force_index]['step'] and starting_step <= self.test_forces[self.test_force_index]['end_step']: # and not self.test_force_applied_this_episode:
+        if len(self.test_forces) > 0 and starting_step_ >= self.test_forces[self.test_force_index]['step'] and starting_step_ <= self.test_forces[self.test_force_index]['end_step']: # and not self.test_force_applied_this_episode:
           # forces always applied to the torso
           body = self.node.torso
           force = self.test_forces[self.test_force_index]['force'] * self.test_forces[self.test_force_index]['direction']
