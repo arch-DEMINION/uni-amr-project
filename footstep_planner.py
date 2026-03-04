@@ -122,8 +122,10 @@ class FootstepPlanner:
         if np.abs(self.plan[starting_index]['disp_ang'][2]) >= self.plan[starting_index]['max_disp_ang'][2]: D_ang[2] = 0.0
 
         # or if the total displacement would be too close to the previous foot, prevent changes in this step
-        if np.abs(self.plan[starting_index]['disp_pos'][0] + self.plan[starting_index]['pos'][0] - self.plan[step]['pos'][0]) <= 0.15: D_pos[0] = 0.0
-        if np.abs(self.plan[starting_index]['disp_pos'][1] + self.plan[starting_index]['pos'][1] - self.plan[step]['pos'][1]) <= 0.15: D_pos[1] = 0.0
+        # if np.abs(self.plan[starting_index]['disp_pos'][0] + self.plan[starting_index]['pos'][0] - self.plan[step]['pos'][0]) <= 0.15: D_pos[0] = 0.0
+        # if np.abs(self.plan[starting_index]['disp_pos'][1] + self.plan[starting_index]['pos'][1] - self.plan[step]['pos'][1]) <= 0.15: D_pos[1] = 0.0
+        if np.abs(D_pos[0] + self.plan[starting_index]['pos'][0] - self.plan[step]['pos'][0]) <= 0.15: D_pos[0] = 0.0
+        if np.abs(D_pos[1] + self.plan[starting_index]['pos'][1] - self.plan[step]['pos'][1]) <= 0.15: D_pos[1] = 0.0
         
         # print(self.plan[starting_index]['pos'], self.plan[starting_index]['disp_pos'] + self.plan[starting_index]['pos'])
 
